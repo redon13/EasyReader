@@ -51,6 +51,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by Readium.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -105,6 +107,7 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.readium.pdfium.document)
     implementation(libs.readium.pdfium.navigator)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit)
 }
