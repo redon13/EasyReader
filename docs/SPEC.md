@@ -42,8 +42,9 @@ Details in [DESIGN.md](DESIGN.md).
 3. **Sort panel** — date added, last modified, title, author, publisher, series; ascending or descending.
 4. **Book details** — large cover, title, author, series and number, rating, tags, language, publisher, description, all custom Calibre columns, and available formats. Buttons: Read, Add to shelf, Favourite, Mark as finished, Remove download. View only: no editing of book details.
 5. **Reader** — EPUB and PDF; font size and typeface; white, light cappuccino or dark background; progress bar; table of contents. Remembers the place in every book and syncs it between devices. `.doc` and other formats open in another app.
-6. **Upload** — pick one or more files on the device; each is sent straight to Calibre with a progress bar, and Calibre reads the title and author from the file.
-7. **Settings**
+6. **Opening books from the device** — EasyReader appears in Android's "Open with" list for EPUB and PDF files and can be set as the default app for them. A book opened this way is read straight away; its place is remembered on that device only. An **Add to Calibre** button uploads it to the library, after which it syncs like any other book.
+7. **Upload** — pick one or more files on the device; each is sent straight to Calibre with a progress bar, and Calibre reads the title and author from the file.
+8. **Settings**
     - Server address, username and password; switch between Calibre libraries.
     - Reader background (white / light cappuccino / dark).
     - Mark as finished at (default 95%).
@@ -87,9 +88,9 @@ See [SERVER-SETUP.md](SERVER-SETUP.md).
 
 1. Connect to the server, log in, and show the library as covers. Includes the project skeleton, GitHub Actions build and Releases.
 2. Browse, search, filters, sort and book details.
-3. Reader with backgrounds, offline downloads and reading position sync.
+3. Reader with backgrounds, offline downloads and reading position sync; opening EPUB and PDF files from the device.
 4. Shelves, favourites, finished status and smart shelves.
-5. Uploads, settings (including Sync Now), tablet layout, clean-up and polish.
+5. Uploads (including Add to Calibre for books opened from the device), settings (including Sync Now), tablet layout, clean-up and polish.
 
 ## Out of scope for version 1
 

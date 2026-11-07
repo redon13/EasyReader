@@ -1,0 +1,78 @@
+# Publishes a signed .apk on the Releases page. Starts either when a version
+# tag (for example v0.1.0) is pushed, or by hand with "Run workflow" on the
+# Actions page, which tags the version itself.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        run: |
+          version=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$tag" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::The tag is $GITHUB_REF_NAME but versionName in app/build.gradle.kts is $version."
+              exit 1
+            fi
+          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "::error::Version $version has already been released. Raise versionName and versionCode first."
+            exit 1
+          fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Get the signing key from the repository's secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.EASYREADER_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::The signing key secrets haven't been added yet. See docs/SIGNING-KEY.md."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests and build the signed app
+        env:
+          EASYREADER_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          EASYREADER_KEYSTORE_PASSWORD: ${{ secrets.EASYREADER_KEYSTORE_PASSWORD }}
+          EASYREADER_KEY_ALIAS: ${{ secrets.EASYREADER_KEY_ALIAS }}
+          EASYREADER_KEY_PASSWORD: ${{ secrets.EASYREADER_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :calibre:test :app:testReleaseUnitTest :app:assembleRelease
+
+      - name: Name the file
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          case "$apk" in *unsigned*) echo "::error::The app wasn't signed. Check the signing secrets."; exit 1;; esac
+          mv "$apk" "EasyReader-$TAG.apk"
+
+      # Creates the version tag too, when started by hand.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: EasyReader ${{ env.TAG }}
+          files: EasyReader-${{ env.TAG }}.apk
+          generate_release_notes: true
+
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

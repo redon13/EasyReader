@@ -40,4 +40,12 @@ EasyReader needs Calibre's content server running on the home PC, four custom co
 
 ## Status
 
-Design approved 7 November 2026. Development starts with Stage 1 (see the build order in the spec).
+Design approved 7 November 2026.
+
+| Stage | What | Status |
+| --- | --- | --- |
+| 1 | Project skeleton, automatic builds and signed releases, connect to the server, sign in, library as covers | Built, waiting for the signing key ([docs/SIGNING-KEY.md](docs/SIGNING-KEY.md)) and the server to test |
+| 2 | Browse, search, filters, sort and book details | Not started |
+| 3 | Reader, offline downloads, reading position sync | Not started |
+| 4 | Shelves, favourites, finished status, smart shelves | Not started |
+| 5 | Uploads, settings, tablet layout, clean-up, polish | Not started |
