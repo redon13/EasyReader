@@ -1,10 +1,12 @@
-# Publishes a signed .apk on the Releases page whenever a version tag
-# (for example v0.1.0) is pushed.
+# Publishes a signed .apk on the Releases page. Starts either when a version
+# tag (for example v0.1.0) is pushed, or by hand with "Run workflow" on the
+# Actions page, which tags the version itself.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,13 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the version number matches the tag
+      - name: Work out the version
         run: |
           version=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::The tag is $GITHUB_REF_NAME but versionName in app/build.gradle.kts is $version."
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$tag" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::The tag is $GITHUB_REF_NAME but versionName in app/build.gradle.kts is $version."
+              exit 1
+            fi
+          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "::error::Version $version has already been released. Raise versionName and versionCode first."
             exit 1
           fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
 
       - name: Get the signing key from the repository's secrets
         env:
@@ -53,11 +62,15 @@ jobs:
         run: |
           apk=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
           case "$apk" in *unsigned*) echo "::error::The app wasn't signed. Check the signing secrets."; exit 1;; esac
-          mv "$apk" "EasyReader-$GITHUB_REF_NAME.apk"
+          mv "$apk" "EasyReader-$TAG.apk"
 
+      # Creates the version tag too, when started by hand.
       - uses: softprops/action-gh-release@v2
         with:
-          files: EasyReader-${{ github.ref_name }}.apk
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: EasyReader ${{ env.TAG }}
+          files: EasyReader-${{ env.TAG }}.apk
           generate_release_notes: true
 
       - name: Remove the signing key
