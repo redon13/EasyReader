@@ -14,8 +14,8 @@ android {
         minSdk = 33
         targetSdk = 35
         // Must go up with every release so updates install over the top.
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     // The release signing key is never stored in the repo. GitHub Actions
@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(platform(libs.compose.bom))
@@ -90,4 +91,6 @@ dependencies {
 
     implementation(libs.datastore.preferences)
     implementation(libs.coil.compose)
+
+    testImplementation(libs.junit)
 }

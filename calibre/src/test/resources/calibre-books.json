@@ -1,0 +1,678 @@
+{
+ "1": {
+  "rating": 5.0,
+  "user_metadata": {
+   "#er_favourite": {
+    "table": "custom_column_2",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Favourite",
+    "search_terms": [
+     "#er_favourite"
+    ],
+    "label": "er_favourite",
+    "colnum": 2,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 22,
+    "#value#": true,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_finished": {
+    "table": "custom_column_3",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Finished",
+    "search_terms": [
+     "#er_finished"
+    ],
+    "label": "er_finished",
+    "colnum": 3,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 23,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_position": {
+    "table": "custom_column_4",
+    "column": "value",
+    "datatype": "comments",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Reading position",
+    "search_terms": [
+     "#er_position"
+    ],
+    "label": "er_position",
+    "colnum": 4,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 24,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_shelves": {
+    "table": "custom_column_1",
+    "column": "value",
+    "datatype": "text",
+    "is_multiple": "|",
+    "kind": "field",
+    "name": "Shelves",
+    "search_terms": [
+     "#er_shelves"
+    ],
+    "label": "er_shelves",
+    "colnum": 1,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 25,
+    "#value#": [
+     "Holiday",
+     "Classics"
+    ],
+    "#extra#": null,
+    "is_multiple2": {
+     "cache_to_list": "|",
+     "ui_to_list": ",",
+     "list_to_ui": ", "
+    }
+   },
+   "#mood": {
+    "table": "custom_column_9",
+    "column": "value",
+    "datatype": "enumeration",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Mood",
+    "search_terms": [
+     "#mood"
+    ],
+    "label": "mood",
+    "colnum": 9,
+    "display": {
+     "enum_values": [
+      "Happy",
+      "Sad"
+     ]
+    },
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 26,
+    "#value#": "Happy",
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#myrating": {
+    "table": "custom_column_5",
+    "column": "value",
+    "datatype": "rating",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "My rating",
+    "search_terms": [
+     "#myrating"
+    ],
+    "label": "myrating",
+    "colnum": 5,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 27,
+    "#value#": 4,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#notes": {
+    "table": "custom_column_10",
+    "column": "value",
+    "datatype": "comments",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Notes",
+    "search_terms": [
+     "#notes"
+    ],
+    "label": "notes",
+    "colnum": 10,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 28,
+    "#value#": "<p>Hello <b>there</b></p>",
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#owned": {
+    "table": "custom_column_12",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Owned",
+    "search_terms": [
+     "#owned"
+    ],
+    "label": "owned",
+    "colnum": 12,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 29,
+    "#value#": false,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#pages": {
+    "table": "custom_column_8",
+    "column": "value",
+    "datatype": "int",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Pages",
+    "search_terms": [
+     "#pages"
+    ],
+    "label": "pages",
+    "colnum": 8,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 30,
+    "#value#": 321,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#price": {
+    "table": "custom_column_11",
+    "column": "value",
+    "datatype": "float",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Price",
+    "search_terms": [
+     "#price"
+    ],
+    "label": "price",
+    "colnum": 11,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 31,
+    "#value#": 9.5,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#readdate": {
+    "table": "custom_column_6",
+    "column": "value",
+    "datatype": "datetime",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Date read",
+    "search_terms": [
+     "#readdate"
+    ],
+    "label": "readdate",
+    "colnum": 6,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 32,
+    "#value#": "2024-03-05T00:00:00+00:00",
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#subseries": {
+    "table": "custom_column_7",
+    "column": "value",
+    "datatype": "series",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Sub series",
+    "search_terms": [
+     "#subseries"
+    ],
+    "label": "subseries",
+    "colnum": 7,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 33,
+    "#value#": "Inner[2]",
+    "#extra#": 1.0,
+    "is_multiple2": {}
+   }
+  },
+  "series_index": 1.0,
+  "publisher": "Penguin",
+  "user_categories": {},
+  "series": "Saga",
+  "title_sort": "Test Book 1",
+  "tags": [
+   "fiction",
+   "test"
+  ],
+  "comments": "<p>A <i>novel</i>.</p>",
+  "thumbnail": "/get/thumb/1/lib",
+  "authors": [
+   "Author 1"
+  ],
+  "pubdate": "1815-12-23T00:00:00+00:00",
+  "uuid": "8a0cc0d4-2b7a-4a8a-915f-5bd370ddfe69",
+  "author_sort": "1, Author",
+  "title": "Test Book 1",
+  "timestamp": "2026-11-07T14:46:35+00:00",
+  "application_id": 1,
+  "link_maps": {},
+  "author_sort_map": {
+   "Author 1": "1, Author"
+  },
+  "cover": "/get/cover/1/lib",
+  "last_modified": "2026-11-07T20:49:09+00:00",
+  "identifiers": {
+   "isbn": "9780141439587"
+  },
+  "languages": [
+   "eng",
+   "fra"
+  ],
+  "format_metadata": {},
+  "formats": [],
+  "main_format": null,
+  "other_formats": {}
+ },
+ "2": {
+  "rating": 0.0,
+  "user_metadata": {
+   "#er_favourite": {
+    "table": "custom_column_2",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Favourite",
+    "search_terms": [
+     "#er_favourite"
+    ],
+    "label": "er_favourite",
+    "colnum": 2,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 22,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_finished": {
+    "table": "custom_column_3",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Finished",
+    "search_terms": [
+     "#er_finished"
+    ],
+    "label": "er_finished",
+    "colnum": 3,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 23,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_position": {
+    "table": "custom_column_4",
+    "column": "value",
+    "datatype": "comments",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Reading position",
+    "search_terms": [
+     "#er_position"
+    ],
+    "label": "er_position",
+    "colnum": 4,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 24,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#er_shelves": {
+    "table": "custom_column_1",
+    "column": "value",
+    "datatype": "text",
+    "is_multiple": "|",
+    "kind": "field",
+    "name": "Shelves",
+    "search_terms": [
+     "#er_shelves"
+    ],
+    "label": "er_shelves",
+    "colnum": 1,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 25,
+    "#value#": [],
+    "#extra#": null,
+    "is_multiple2": {
+     "cache_to_list": "|",
+     "ui_to_list": ",",
+     "list_to_ui": ", "
+    }
+   },
+   "#mood": {
+    "table": "custom_column_9",
+    "column": "value",
+    "datatype": "enumeration",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Mood",
+    "search_terms": [
+     "#mood"
+    ],
+    "label": "mood",
+    "colnum": 9,
+    "display": {
+     "enum_values": [
+      "Happy",
+      "Sad"
+     ]
+    },
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 26,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#myrating": {
+    "table": "custom_column_5",
+    "column": "value",
+    "datatype": "rating",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "My rating",
+    "search_terms": [
+     "#myrating"
+    ],
+    "label": "myrating",
+    "colnum": 5,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 27,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#notes": {
+    "table": "custom_column_10",
+    "column": "value",
+    "datatype": "comments",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Notes",
+    "search_terms": [
+     "#notes"
+    ],
+    "label": "notes",
+    "colnum": 10,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 28,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#owned": {
+    "table": "custom_column_12",
+    "column": "value",
+    "datatype": "bool",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Owned",
+    "search_terms": [
+     "#owned"
+    ],
+    "label": "owned",
+    "colnum": 12,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 29,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#pages": {
+    "table": "custom_column_8",
+    "column": "value",
+    "datatype": "int",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Pages",
+    "search_terms": [
+     "#pages"
+    ],
+    "label": "pages",
+    "colnum": 8,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 30,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#price": {
+    "table": "custom_column_11",
+    "column": "value",
+    "datatype": "float",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Price",
+    "search_terms": [
+     "#price"
+    ],
+    "label": "price",
+    "colnum": 11,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 31,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#readdate": {
+    "table": "custom_column_6",
+    "column": "value",
+    "datatype": "datetime",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Date read",
+    "search_terms": [
+     "#readdate"
+    ],
+    "label": "readdate",
+    "colnum": 6,
+    "display": {},
+    "is_custom": true,
+    "is_category": false,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 32,
+    "#value#": "None",
+    "#extra#": null,
+    "is_multiple2": {}
+   },
+   "#subseries": {
+    "table": "custom_column_7",
+    "column": "value",
+    "datatype": "series",
+    "is_multiple": null,
+    "kind": "field",
+    "name": "Sub series",
+    "search_terms": [
+     "#subseries"
+    ],
+    "label": "subseries",
+    "colnum": 7,
+    "display": {},
+    "is_custom": true,
+    "is_category": true,
+    "link_column": "value",
+    "category_sort": "value",
+    "is_csp": false,
+    "is_editable": true,
+    "rec_index": 33,
+    "#value#": null,
+    "#extra#": null,
+    "is_multiple2": {}
+   }
+  },
+  "series_index": 2.0,
+  "publisher": null,
+  "user_categories": {},
+  "series": "Saga",
+  "title_sort": "Test Book 2",
+  "tags": [
+   "fiction",
+   "test"
+  ],
+  "comments": null,
+  "thumbnail": "/get/thumb/2/lib",
+  "authors": [
+   "Author 2"
+  ],
+  "pubdate": "None",
+  "uuid": "3fb72c08-562c-453f-9ac0-731d658169e8",
+  "author_sort": "2, Author",
+  "title": "Test Book 2",
+  "timestamp": "2026-11-07T14:46:35+00:00",
+  "application_id": 2,
+  "link_maps": {},
+  "author_sort_map": {
+   "Author 2": "2, Author"
+  },
+  "cover": "/get/cover/2/lib",
+  "last_modified": "2026-11-07T20:49:06+00:00",
+  "identifiers": {},
+  "languages": [],
+  "format_metadata": {},
+  "formats": [],
+  "main_format": null,
+  "other_formats": {}
+ }
+}

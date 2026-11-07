@@ -31,7 +31,28 @@ data class CalibreBook(
     val pubdate: String?,
     /** HTML description. */
     val comments: String?,
+    /** e.g. "isbn" → "9780141439587". */
+    val identifiers: Map<String, String> = emptyMap(),
+    /** Every custom column, including EasyReader's own (#er_…), sorted by name. */
+    val customColumns: List<CustomColumnValue> = emptyList(),
     val rawJson: String,
+) {
+    fun customColumn(lookupName: String): CustomColumnValue? = customColumns.firstOrNull { it.lookupName == lookupName }
+}
+
+/** One custom column's value for a book. */
+data class CustomColumnValue(
+    /** e.g. "#er_shelves". */
+    val lookupName: String,
+    /** The column heading shown in Calibre. */
+    val name: String,
+    /** Calibre's type: text, comments, bool, int, float, rating, datetime, series, enumeration, composite. */
+    val datatype: String,
+    /**
+     * Ready to show: Yes/No for bool, stars for rating, "Name #2" for series.
+     * Dates are left as ISO date/time text for the app to format. Empty if no value.
+     */
+    val values: List<String>,
 )
 
 /** A custom column EasyReader needs in Calibre. */

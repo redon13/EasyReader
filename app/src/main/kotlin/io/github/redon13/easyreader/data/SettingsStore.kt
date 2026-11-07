@@ -4,10 +4,13 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import io.github.redon13.easyreader.data.browse.SortField
+import io.github.redon13.easyreader.data.browse.SortOrder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -72,6 +75,28 @@ class SettingsStore(context: Context) {
         store.edit { it[LAST_SYNCED] = time }
     }
 
+    /** The chosen sort order (date added, newest first, until changed). */
+    val sortOrder: Flow<SortOrder> = store.data.map { p ->
+        SortOrder(
+            field = p[SORT_FIELD]?.let { name -> SortField.entries.firstOrNull { it.name == name } } ?: SortField.DATE_ADDED,
+            descending = p[SORT_DESCENDING] ?: true,
+        )
+    }
+
+    suspend fun saveSortOrder(order: SortOrder) {
+        store.edit {
+            it[SORT_FIELD] = order.field.name
+            it[SORT_DESCENDING] = order.descending
+        }
+    }
+
+    /** Whether book lists are shown as a list (true) or a cover grid (false). */
+    val listView: Flow<Boolean> = store.data.map { it[LIST_VIEW] ?: false }
+
+    suspend fun saveListView(list: Boolean) {
+        store.edit { it[LIST_VIEW] = list }
+    }
+
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val USERNAME = stringPreferencesKey("username")
@@ -79,6 +104,9 @@ class SettingsStore(context: Context) {
         val LIBRARY_ID = stringPreferencesKey("library_id")
         val LIBRARY_NAME = stringPreferencesKey("library_name")
         val LAST_SYNCED = longPreferencesKey("last_synced")
+        val SORT_FIELD = stringPreferencesKey("sort_field")
+        val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
+        val LIST_VIEW = booleanPreferencesKey("list_view")
     }
 }
 
