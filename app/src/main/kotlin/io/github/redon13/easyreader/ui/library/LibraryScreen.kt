@@ -69,7 +69,8 @@ import io.github.redon13.easyreader.ui.theme.EasyColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(container: AppContainer, session: Session) {
-    val vm = viewModel(key = session.libraryId) {
+    // A fresh screen state for each sign-in and library, so an old login is never reused.
+    val vm = viewModel(key = "library-${session.libraryId}-${System.identityHashCode(session.client)}") {
         LibraryViewModel(container.library, container.sessions, session)
     }
     val books by vm.books.collectAsStateWithLifecycle()

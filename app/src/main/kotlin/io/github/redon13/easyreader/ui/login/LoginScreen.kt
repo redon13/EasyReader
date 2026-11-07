@@ -52,7 +52,7 @@ import io.github.redon13.easyreader.ui.theme.EasyColors
 
 @Composable
 fun LoginScreen(container: AppContainer, state: SessionState.SignedOut) {
-    val vm = viewModel { LoginViewModel(container.sessions, state) }
+    val vm = viewModel(key = "login-$state") { LoginViewModel(container.sessions, state) }
     var showPassword by remember { mutableStateOf(false) }
 
     Box(
