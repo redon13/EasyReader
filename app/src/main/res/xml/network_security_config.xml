@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Calibre's content server is reached over plain http:// through Tailscale.
+  Android blocks plain http by default; it is allowed here because Tailscale
+  already encrypts all traffic between the owner's devices.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
