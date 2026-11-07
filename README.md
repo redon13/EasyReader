@@ -45,7 +45,7 @@ Design approved 7 November 2026.
 | Stage | What | Status |
 | --- | --- | --- |
 | 1 | Project skeleton, automatic builds and signed releases, connect to the server, sign in, library as covers | Done (v0.1.0) |
-| 2 | Browse, search, filters, sort and book details | Built, ready for testing (v0.2.0) |
-| 3 | Reader, offline downloads, reading position sync, opening EPUB/PDF files from the device | Not started |
+| 2 | Browse, search, filters, sort and book details | Done (v0.2.0) |
+| 3 | Reader, offline downloads, reading position sync, opening EPUB/PDF files from the device | Built, ready for testing (v0.3.0) |
 | 4 | Shelves, favourites, finished status, smart shelves | Not started |
 | 5 | Uploads, settings, tablet layout, clean-up, polish | Not started |

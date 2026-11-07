@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,6 +22,26 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 private val Context.dataStore by preferencesDataStore("settings")
+
+/** Reader backgrounds from docs/DESIGN.md. */
+enum class ReaderTheme(val label: String, val background: Long, val text: Long, val secondary: Long) {
+    WHITE("White", 0xFFFFFFFF, 0xFF1C1C1C, 0xFF5E5E5E),
+    CAPPUCCINO("Light cappuccino", 0xFFEFE2CF, 0xFF3B2A1C, 0xFF6E5844),
+    DARK("Dark", 0xFF121212, 0xFFD8D2C8, 0xFF9C958B),
+}
+
+enum class ReaderTypeface(val label: String) {
+    ALEGREYA("Alegreya"),
+    ALEGREYA_SANS("Alegreya Sans"),
+    ORIGINAL("Book's own"),
+}
+
+data class ReaderSettings(
+    val theme: ReaderTheme = ReaderTheme.WHITE,
+    /** 1.0 is the normal size; the design's default (20 sp) is a little larger. */
+    val fontSize: Double = 1.2,
+    val typeface: ReaderTypeface = ReaderTypeface.ALEGREYA,
+)
 
 data class SavedLogin(
     val serverUrl: String,
@@ -97,6 +118,22 @@ class SettingsStore(context: Context) {
         store.edit { it[LIST_VIEW] = list }
     }
 
+    val readerSettings: Flow<ReaderSettings> = store.data.map { p ->
+        ReaderSettings(
+            theme = p[READER_THEME]?.let { n -> ReaderTheme.entries.firstOrNull { it.name == n } } ?: ReaderTheme.WHITE,
+            fontSize = p[READER_FONT_SIZE] ?: 1.2,
+            typeface = p[READER_TYPEFACE]?.let { n -> ReaderTypeface.entries.firstOrNull { it.name == n } } ?: ReaderTypeface.ALEGREYA,
+        )
+    }
+
+    suspend fun saveReaderSettings(settings: ReaderSettings) {
+        store.edit {
+            it[READER_THEME] = settings.theme.name
+            it[READER_FONT_SIZE] = settings.fontSize
+            it[READER_TYPEFACE] = settings.typeface.name
+        }
+    }
+
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val USERNAME = stringPreferencesKey("username")
@@ -107,6 +144,9 @@ class SettingsStore(context: Context) {
         val SORT_FIELD = stringPreferencesKey("sort_field")
         val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
         val LIST_VIEW = booleanPreferencesKey("list_view")
+        val READER_THEME = stringPreferencesKey("reader_theme")
+        val READER_FONT_SIZE = doublePreferencesKey("reader_font_size")
+        val READER_TYPEFACE = stringPreferencesKey("reader_typeface")
     }
 }
 

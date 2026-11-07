@@ -42,6 +42,7 @@ fun BookListScreen(vm: BrowseViewModel, kind: ListKind, onBack: () -> Unit, onOp
     val books by (if (kind == ListKind.RECENT) vm.recentlyAdded else vm.allBooks).collectAsStateWithLifecycle()
     val listView by vm.listView.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
+    val positions by vm.positions.collectAsStateWithLifecycle()
     var showSort by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -83,8 +84,9 @@ fun BookListScreen(vm: BrowseViewModel, kind: ListKind, onBack: () -> Unit, onOp
                 )
             }
             items(books, key = { it.id }) { book ->
-                if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) })
-                else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) })
+                val progress = positions[book.id]?.progress?.toFloat()
+                if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
+                else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
             }
         }
     }

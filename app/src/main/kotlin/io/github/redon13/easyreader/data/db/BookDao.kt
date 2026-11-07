@@ -13,6 +13,9 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE libraryId = :libraryId ORDER BY timestamp DESC, id DESC")
     fun observeLibrary(libraryId: String): Flow<List<BookEntity>>
 
+    @Query("SELECT * FROM books WHERE libraryId = :libraryId AND id = :id")
+    suspend fun book(libraryId: String, id: Int): BookEntity?
+
     @Query("DELETE FROM books WHERE libraryId = :libraryId")
     suspend fun deleteLibrary(libraryId: String)
 

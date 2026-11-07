@@ -79,20 +79,25 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.ColumnCheck
+import io.github.redon13.easyreader.calibre.ReadingPosition
 import io.github.redon13.easyreader.calibre.RequiredColumn
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.FilterCategory
+import io.github.redon13.easyreader.ui.browse.BookCoverImage
 import io.github.redon13.easyreader.ui.browse.BookListRow
 import io.github.redon13.easyreader.ui.browse.BookTile
 import io.github.redon13.easyreader.ui.browse.BrowseViewModel
 import io.github.redon13.easyreader.ui.browse.FiltersSheet
 import io.github.redon13.easyreader.ui.browse.GridViewIcon
 import io.github.redon13.easyreader.ui.browse.ListKind
+import io.github.redon13.easyreader.ui.browse.ReadingProgressBar
 import io.github.redon13.easyreader.ui.browse.SortSheet
+import io.github.redon13.easyreader.ui.reader.ReaderActivity
 import io.github.redon13.easyreader.ui.theme.EasyColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,6 +114,10 @@ fun HomeScreen(
     val all by vm.allBooks.collectAsStateWithLifecycle()
     val listView by vm.listView.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
+    val positions by vm.positions.collectAsStateWithLifecycle()
+    val reading by vm.continueReading.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val openReader: (Int) -> Unit = { id -> ReaderActivity.open(context, vm.session.libraryId, id) }
     val syncing by vm.syncing.collectAsStateWithLifecycle()
     val libraries by vm.libraries.collectAsStateWithLifecycle()
     val columns by vm.columns.collectAsStateWithLifecycle()
@@ -172,6 +181,9 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(if (query.isNarrowed && listView) 4.dp else 20.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
+                    reading.firstOrNull()?.takeIf { !query.isNarrowed }?.let { (book, position) ->
+                        fullWidth("hero") { ContinueCard(book, position, vm, onClick = { openReader(book.id) }) }
+                    }
                     fullWidth("controls") {
                         Controls(
                             vm = vm,
@@ -185,13 +197,18 @@ fun HomeScreen(
                         fullWidth("columns") { ColumnBanner(check, onHelp = { showColumnHelp = true }) }
                     }
                     if (query.isNarrowed) {
-                        resultsSection(vm, query.filters, results, listView, onOpenBook)
+                        resultsSection(vm, query.filters, results, listView, positions, onOpenBook)
                     } else {
+                        if (reading.size > 1) {
+                            fullWidth("reading") {
+                                CoverRow("Continue reading", null, reading.map { it.first }, vm, positions, openReader, onSeeAll = null)
+                            }
+                        }
                         fullWidth("recent") {
-                            CoverRow("Recently added", null, recent, vm, onOpenBook) { onSeeAll(ListKind.RECENT) }
+                            CoverRow("Recently added", null, recent, vm, positions, onOpenBook) { onSeeAll(ListKind.RECENT) }
                         }
                         fullWidth("all") {
-                            CoverRow("All books", sort.label, all, vm, onOpenBook) { onSeeAll(ListKind.ALL) }
+                            CoverRow("All books", sort.label, all, vm, positions, onOpenBook) { onSeeAll(ListKind.ALL) }
                         }
                         fullWidth("summary") { SummaryLine(library.size, lastSynced) }
                     }
@@ -216,6 +233,7 @@ private fun LazyGridScope.resultsSection(
     filters: Map<FilterCategory, String>,
     results: List<CalibreBook>,
     listView: Boolean,
+    positions: Map<Int, ReadingPosition>,
     onOpenBook: (Int) -> Unit,
 ) {
     fullWidth("active") {
@@ -264,8 +282,9 @@ private fun LazyGridScope.resultsSection(
         }
     }
     items(results, key = { it.id }) { book ->
-        if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) })
-        else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) })
+        val progress = positions[book.id]?.progress?.toFloat()
+        if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
+        else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
     }
 }
 
@@ -342,8 +361,9 @@ private fun CoverRow(
     subtitle: String?,
     books: List<CalibreBook>,
     vm: BrowseViewModel,
+    positions: Map<Int, ReadingPosition>,
     onOpenBook: (Int) -> Unit,
-    onSeeAll: () -> Unit,
+    onSeeAll: (() -> Unit)?,
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,20 +373,63 @@ private fun CoverRow(
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = EasyColors.TextMuted)
                 }
             }
-            TextButton(onClick = onSeeAll) {
-                Text("See all", color = EasyColors.Accent, fontWeight = FontWeight.Bold)
+            if (onSeeAll != null) {
+                TextButton(onClick = onSeeAll) {
+                    Text("See all", color = EasyColors.Accent, fontWeight = FontWeight.Bold)
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(books.take(ROW_LENGTH), key = { it.id }) { book ->
-                BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, modifier = Modifier.width(112.dp))
+                BookTile(
+                    book,
+                    vm.coverUrl(book),
+                    onClick = { onOpenBook(book.id) },
+                    modifier = Modifier.width(112.dp),
+                    progress = positions[book.id]?.progress?.toFloat(),
+                )
             }
         }
     }
 }
 
 private const val ROW_LENGTH = 20
+
+/** The "Continue reading" card: the book read most recently, one tap to carry on. */
+@Composable
+private fun ContinueCard(book: CalibreBook, position: ReadingPosition, vm: BrowseViewModel, onClick: () -> Unit) {
+    val chapter = remember(position.locator) {
+        position.locator?.let { runCatching { org.json.JSONObject(it).optString("title") }.getOrNull() }?.takeIf { it.isNotBlank() }
+    }
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EasyColors.HeroCard, contentColor = EasyColors.Text),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            BookCoverImage(book, vm.coverUrl(book), Modifier.width(72.dp), small = true)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Continue reading", style = MaterialTheme.typography.labelMedium, color = EasyColors.Accent)
+                Text(book.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (book.authors.isNotEmpty()) {
+                    Text(book.authors.joinToString(" & "), style = MaterialTheme.typography.bodyMedium, color = EasyColors.TextMuted, maxLines = 1)
+                }
+                Text(
+                    listOfNotNull(chapter, "${(position.progress * 100).toInt()}%").joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EasyColors.TextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                ReadingProgressBar(position.progress.toFloat(), Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
 
 @Composable
 private fun HomeMenu(vm: BrowseViewModel, libraries: Map<String, String>) {

@@ -14,8 +14,12 @@ android {
         minSdk = 33
         targetSdk = 35
         // Must go up with every release so updates install over the top.
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+
+        // Both of the owner's Samsung devices are 64-bit ARM. Leaving out the
+        // other processor types keeps the PDF engine (and the app) much smaller.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     // The release signing key is never stored in the repo. GitHub Actions
@@ -91,6 +95,16 @@ dependencies {
 
     implementation(libs.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.work.runtime)
+
+    // Readium: the open-source EPUB and PDF reader.
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.fragment)
+    implementation(libs.readium.shared)
+    implementation(libs.readium.streamer)
+    implementation(libs.readium.navigator)
+    implementation(libs.readium.pdfium.document)
+    implementation(libs.readium.pdfium.navigator)
 
     testImplementation(libs.junit)
 }
