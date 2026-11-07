@@ -7,4 +7,11 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowSplashScreenBackground">@color/navy</item>
     </style>
+
+    <!-- The reader needs an AppCompat theme (Readium's page views use AppCompat). -->
+    <style name="Theme.EasyReader.Reader" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/navy</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

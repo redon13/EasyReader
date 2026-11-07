@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextAlign
@@ -48,10 +49,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.CustomColumnValue
 import io.github.redon13.easyreader.calibre.RequiredColumn
+import io.github.redon13.easyreader.data.Downloads
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.FilterCategory
 import io.github.redon13.easyreader.ui.browse.BookCoverImage
 import io.github.redon13.easyreader.ui.browse.BrowseViewModel
+import io.github.redon13.easyreader.ui.browse.ReadingProgressBar
+import io.github.redon13.easyreader.ui.reader.ReaderActivity
 import io.github.redon13.easyreader.ui.browse.seriesText
 import io.github.redon13.easyreader.ui.theme.EasyColors
 import java.time.OffsetDateTime
@@ -133,43 +137,18 @@ private fun Details(
                     )
                 }
                 book.rating?.let { Text(stars(it), style = MaterialTheme.typography.bodyLarge, color = EasyColors.Accent) }
-                if (book.formats.isNotEmpty()) {
-                    Text(book.formats.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = EasyColors.TextMuted)
+                val read = vm.positions.collectAsStateWithLifecycle().value[book.id]?.progress
+                val line = listOfNotNull(
+                    read?.takeIf { it > 0 }?.let { "${(it * 100).toInt()}% read" },
+                    book.formats.joinToString(" · ").ifEmpty { null },
+                )
+                if (line.isNotEmpty()) {
+                    Text(line.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = EasyColors.TextMuted)
                 }
             }
         }
 
-        // Shown greyed out until reading (Stage 3) and shelves/finished (Stage 4) are ready.
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = {},
-                enabled = false,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    disabledContainerColor = EasyColors.Accent.copy(alpha = 0.3f),
-                    disabledContentColor = EasyColors.OnAccent.copy(alpha = 0.6f),
-                ),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Read", style = MaterialTheme.typography.labelLarge) }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("Add to shelf", "Mark as finished").forEach { label ->
-                    OutlinedButton(
-                        onClick = {},
-                        enabled = false,
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, EasyColors.Outline.copy(alpha = 0.4f)),
-                        modifier = Modifier.weight(1f).height(48.dp),
-                    ) { Text(label, color = EasyColors.TextMuted.copy(alpha = 0.6f)) }
-                }
-            }
-            Text(
-                "Reading arrives in the next update; shelves, favourites and finished in the one after.",
-                style = MaterialTheme.typography.bodySmall,
-                color = EasyColors.TextMuted,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        ReadingButtons(vm, book)
 
         InfoPanel(book, onShowOnly)
 
@@ -196,6 +175,67 @@ private fun Details(
                 Text(AnnotatedString.fromHtml(html), style = MaterialTheme.typography.bodyLarge)
             }
         }
+    }
+}
+
+/** Read / Continue reading, Remove download, and (greyed out until Stage 4) shelf and finished. */
+@Composable
+private fun ReadingButtons(vm: BrowseViewModel, book: CalibreBook) {
+    val context = LocalContext.current
+    val positions by vm.positions.collectAsStateWithLifecycle()
+    val downloaded by vm.downloaded.collectAsStateWithLifecycle()
+    val progress = positions[book.id]?.progress
+    val format = Downloads.bestFormat(book)
+    val label = when {
+        format == null -> "No file to read"
+        format !in Downloads.READABLE -> "Open in another app"
+        progress != null && progress > 0.0 -> "Continue reading · ${(progress * 100).toInt()}%"
+        else -> "Read"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(
+            onClick = { ReaderActivity.open(context, vm.session.libraryId, book.id) },
+            enabled = format != null,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = EasyColors.Accent,
+                contentColor = EasyColors.OnAccent,
+                disabledContainerColor = EasyColors.SurfaceHigh,
+                disabledContentColor = EasyColors.TextMuted,
+            ),
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) { Text(label, style = MaterialTheme.typography.labelLarge) }
+        if (progress != null && progress > 0.0) {
+            ReadingProgressBar(progress.toFloat(), Modifier.fillMaxWidth())
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Shelves and finished come in Stage 4; shown greyed out until then.
+            listOf("Add to shelf", "Mark as finished").forEach { text ->
+                OutlinedButton(
+                    onClick = {},
+                    enabled = false,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, EasyColors.Outline.copy(alpha = 0.4f)),
+                    modifier = Modifier.weight(1f).height(48.dp),
+                ) { Text(text, color = EasyColors.TextMuted.copy(alpha = 0.6f)) }
+            }
+        }
+        if (book.id in downloaded) {
+            OutlinedButton(
+                onClick = { vm.removeDownload(book.id) },
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, EasyColors.Outline),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) { Text("Remove download", color = EasyColors.Text) }
+        }
+        Text(
+            "Shelves, favourites and finished arrive in the next update.",
+            style = MaterialTheme.typography.bodySmall,
+            color = EasyColors.TextMuted,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

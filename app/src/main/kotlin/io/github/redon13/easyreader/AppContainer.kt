@@ -1,7 +1,9 @@
 package io.github.redon13.easyreader
 
 import android.content.Context
+import io.github.redon13.easyreader.data.Downloads
 import io.github.redon13.easyreader.data.LibraryRepository
+import io.github.redon13.easyreader.data.PositionSync
 import io.github.redon13.easyreader.data.SessionManager
 import io.github.redon13.easyreader.data.SettingsStore
 import io.github.redon13.easyreader.data.db.AppDatabase
@@ -16,4 +18,6 @@ class AppContainer(context: Context) {
     val database = AppDatabase.create(context)
     val sessions = SessionManager(settings, database.books(), appScope)
     val library = LibraryRepository(database.books(), settings, sessions)
+    val positions = PositionSync(context.applicationContext, database.reading(), sessions, appScope)
+    val downloads = Downloads(context.applicationContext, database.reading())
 }

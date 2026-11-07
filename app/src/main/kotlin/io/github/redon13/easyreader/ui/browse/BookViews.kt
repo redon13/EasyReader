@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,11 +62,34 @@ fun BookCoverImage(book: CalibreBook, coverUrl: String, modifier: Modifier = Mod
     }
 }
 
-/** One book in a grid or row: cover, title and author. */
+/** A thin amber bar showing how far through a book the owner is (0–1). */
 @Composable
-fun BookTile(book: CalibreBook, coverUrl: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ReadingProgressBar(progress: Float, modifier: Modifier = Modifier) {
+    LinearProgressIndicator(
+        progress = { progress.coerceIn(0f, 1f) },
+        color = EasyColors.Accent,
+        trackColor = EasyColors.SurfaceHigh,
+        drawStopIndicator = {},
+        gapSize = 0.dp,
+        modifier = modifier.height(3.dp).clip(RoundedCornerShape(2.dp)),
+    )
+}
+
+/** One book in a grid or row: cover, reading progress, title and author. */
+@Composable
+fun BookTile(
+    book: CalibreBook,
+    coverUrl: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+) {
     Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick)) {
         BookCoverImage(book, coverUrl, Modifier.fillMaxWidth())
+        if (progress != null) {
+            Spacer(Modifier.height(6.dp))
+            ReadingProgressBar(progress, Modifier.fillMaxWidth())
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             book.title,
@@ -87,7 +111,13 @@ fun BookTile(book: CalibreBook, coverUrl: String, onClick: () -> Unit, modifier:
 
 /** One book in list view: small cover, title, author, series and formats. */
 @Composable
-fun BookListRow(book: CalibreBook, coverUrl: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun BookListRow(
+    book: CalibreBook,
+    coverUrl: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+) {
     Row(
         modifier
             .fillMaxWidth()
@@ -109,7 +139,11 @@ fun BookListRow(book: CalibreBook, coverUrl: String, onClick: () -> Unit, modifi
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            val extra = listOfNotNull(seriesText(book), book.formats.joinToString(" · ").ifEmpty { null })
+            val extra = listOfNotNull(
+                seriesText(book),
+                book.formats.joinToString(" · ").ifEmpty { null },
+                progress?.let { "${(it * 100).toInt()}% read" },
+            )
             if (extra.isNotEmpty()) {
                 Text(
                     extra.joinToString("  ·  "),

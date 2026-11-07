@@ -11,6 +11,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // The PDF engine used by Readium is only published on JitPack.
+        // Limited to that one publisher so nothing else is fetched from there.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.marain87") }
+        }
     }
 }
 

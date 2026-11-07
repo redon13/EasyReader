@@ -1,8 +1,11 @@
 package io.github.redon13.easyreader.calibre
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -10,13 +13,20 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 /**
  * Talks to one Calibre content server, using the same JSON endpoints as
@@ -123,28 +133,97 @@ class CalibreClient(
         return b.build()
     }
 
-    private suspend fun getJson(url: HttpUrl): JsonElement = withContext(Dispatchers.IO) {
+    /** Details of a single book, or null if it's no longer in the library. */
+    suspend fun book(libraryId: String, id: Int): CalibreBook? = books(libraryId, listOf(id)).firstOrNull()
+
+    /**
+     * Saves one custom column's value for a book (null clears it). The
+     * Calibre user must be allowed to make changes.
+     */
+    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, value: String?) {
+        val url = url("cdb", "set-fields", bookId.toString(), libraryId)
+        val payload = buildJsonObject {
+            put("changes", buildJsonObject { put(lookupName, value?.let(::JsonPrimitive) ?: JsonNull) })
+            put("loaded_book_ids", JsonArray(emptyList()))
+        }
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        execute(request) { }
+    }
+
+    /**
+     * Downloads one format of a book (e.g. "EPUB") into [destination].
+     * [onProgress] gets 0–1, or null while the size is unknown.
+     */
+    suspend fun downloadFormat(
+        libraryId: String,
+        bookId: Int,
+        format: String,
+        destination: File,
+        onProgress: (Float?) -> Unit = {},
+    ) {
+        val url = url("get", format.uppercase(), bookId.toString(), libraryId)
+        val partial = File(destination.path + ".part")
+        destination.parentFile?.mkdirs()
+        try {
+            execute(Request.Builder().url(url).build()) { response ->
+                val body = response.body ?: throw CalibreException.UnexpectedResponse(null)
+                val total = body.contentLength().takeIf { it > 0 }
+                body.byteStream().use { input ->
+                    partial.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        var done = 0L
+                        while (true) {
+                            coroutineContext.ensureActive()
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            output.write(buffer, 0, n)
+                            done += n
+                            onProgress(total?.let { done.toFloat() / it })
+                        }
+                    }
+                }
+            }
+            if (!partial.renameTo(destination)) throw CalibreException.UnexpectedResponse(null)
+        } finally {
+            partial.delete()
+        }
+    }
+
+    // ----------------------------------------------------------------------
+
+    private suspend fun getJson(url: HttpUrl): JsonElement {
         val request = Request.Builder().url(url).header("Accept", "application/json").build()
-        val body = try {
+        val body = execute(request) { it.body?.string() ?: "" }
+        return try {
+            json.parseToJsonElement(body)
+        } catch (e: Exception) {
+            throw CalibreException.UnexpectedResponse(e)
+        }
+    }
+
+    /** Sends a request and turns failures into [CalibreException]s the owner can understand. */
+    private suspend fun <T> execute(request: Request, read: suspend (Response) -> T): T = withContext(Dispatchers.IO) {
+        try {
             httpClient.newCall(request).execute().use { response ->
                 when {
                     response.code == 401 -> throw CalibreException.WrongLogin()
                     response.code == 403 || response.code == 404 -> throw CalibreException.NotAllowed()
                     !response.isSuccessful -> throw CalibreException.ServerError(response.code)
                 }
-                response.body?.string() ?: ""
+                read(response)
             }
         } catch (e: CalibreException) {
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             throw CalibreException.CannotReach(e)
         } catch (e: IllegalArgumentException) {
             throw CalibreException.BadAddress()
-        }
-        try {
-            json.parseToJsonElement(body)
-        } catch (e: Exception) {
-            throw CalibreException.UnexpectedResponse(e)
         }
     }
 

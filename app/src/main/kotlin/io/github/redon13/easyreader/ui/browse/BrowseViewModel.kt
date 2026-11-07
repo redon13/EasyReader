@@ -10,6 +10,8 @@ import io.github.redon13.easyreader.AppContainer
 import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.CalibreBookParser
 import io.github.redon13.easyreader.calibre.ColumnCheck
+import io.github.redon13.easyreader.calibre.ReadingPosition
+import io.github.redon13.easyreader.calibre.serverPosition
 import io.github.redon13.easyreader.data.Session
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.BrowseQuery
@@ -34,6 +36,7 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     private val repo = container.library
     private val sessions = container.sessions
     private val settings = container.settings
+    private val downloads = container.downloads
 
     /** All books in the library, or null until the stored copy has been read. */
     val books: StateFlow<List<CalibreBook>?> = repo.books(session.libraryId)
@@ -71,6 +74,37 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     val allBooks: StateFlow<List<CalibreBook>> = combine(books, sort) { b, o -> Browse.sort(b.orEmpty(), o) }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * The latest reading position for each book: from Calibre (as of the last
+     * sync) or from this device, whichever is newer.
+     */
+    val positions: StateFlow<Map<Int, ReadingPosition>> =
+        combine(books, container.positions.localPositions(session.libraryId)) { b, local ->
+            val out = HashMap<Int, ReadingPosition>()
+            b.orEmpty().forEach { book -> book.serverPosition?.let { out[book.id] = it } }
+            local.forEach { (id, p) -> if (p.isNewerThan(out[id])) out[id] = p }
+            out as Map<Int, ReadingPosition>
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Books started but not finished, most recently read first. */
+    val continueReading: StateFlow<List<Pair<CalibreBook, ReadingPosition>>> = combine(books, positions) { b, p ->
+        b.orEmpty()
+            .mapNotNull { book -> p[book.id]?.takeIf { it.progress > 0.0 && it.progress < 0.995 }?.let { book to it } }
+            .sortedByDescending { it.second.timestamp }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Ids of books whose files are on this device. */
+    val downloaded: StateFlow<Set<Int>> = downloads.downloadedIds(session.libraryId)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    fun removeDownload(bookId: Int) {
+        viewModelScope.launch { downloads.remove(session.libraryId, bookId) }
+    }
 
     val syncing: StateFlow<Boolean> = repo.syncing
     val libraries: StateFlow<Map<String, String>> = repo.libraries

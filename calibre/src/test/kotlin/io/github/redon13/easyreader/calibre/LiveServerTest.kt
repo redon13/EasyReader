@@ -13,7 +13,7 @@ import org.junit.Test
 class LiveServerTest {
     private val url = System.getenv("CALIBRE_TEST_URL")
 
-    @Test fun `logs in and reads the library`() = runBlocking {
+    @Test fun `logs in and reads the library`(): Unit = runBlocking {
         assumeTrue(url != null)
         val client = CalibreClient(
             CalibreClient.normaliseAddress(url!!)!!,
@@ -36,5 +36,24 @@ class LiveServerTest {
         println("Thumbnail: ${thumb.code} ${thumb.header("Content-Type")}")
         assertTrue(thumb.isSuccessful)
         thumb.close()
+
+        // Save a reading position, read it back, then put the old value back.
+        val first = books.first()
+        val before = first.customColumn(ReadingPosition.COLUMN)?.values?.firstOrNull()
+        val pos = ReadingPosition("""{"href":"a.html"}""", 0.5, System.currentTimeMillis(), "Test", "EPUB")
+        client.setCustomColumn(lib, first.id, ReadingPosition.COLUMN, pos.toJson())
+        val saved = client.book(lib, first.id)!!.serverPosition
+        println("Saved position: $saved")
+        assertTrue(saved!!.timestamp == pos.timestamp)
+        client.setCustomColumn(lib, first.id, ReadingPosition.COLUMN, before)
+
+        // Download the first book that has a file.
+        books.firstOrNull { it.formats.isNotEmpty() }?.let { b ->
+            val dest = java.io.File.createTempFile("live", "." + b.formats.first().lowercase())
+            client.downloadFormat(lib, b.id, b.formats.first(), dest)
+            println("Downloaded ${b.formats.first()}: ${dest.length()} bytes")
+            assertTrue(dest.length() > 0)
+            dest.delete()
+        }
     }
 }
