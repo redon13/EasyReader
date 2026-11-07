@@ -3,13 +3,11 @@ package io.github.redon13.easyreader.calibre
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -98,7 +96,7 @@ class CalibreClient(
             for ((key, value) in obj) {
                 val id = key.toIntOrNull() ?: continue
                 val book = value as? JsonObject ?: continue
-                out += parseBook(id, book)
+                out += CalibreBookParser.parse(id, book)
             }
         }
         return out
@@ -150,26 +148,6 @@ class CalibreClient(
         }
     }
 
-    private fun parseBook(id: Int, o: JsonObject) = CalibreBook(
-        id = id,
-        title = o["title"].stringOrNull() ?: "Untitled",
-        titleSort = o["title_sort"].stringOrNull(),
-        authors = o["authors"].stringList(),
-        authorSort = o["author_sort"].stringOrNull(),
-        series = o["series"].stringOrNull(),
-        seriesIndex = (o["series_index"] as? JsonPrimitive)?.doubleOrNull,
-        tags = o["tags"].stringList(),
-        languages = o["languages"].stringList(),
-        publisher = o["publisher"].stringOrNull(),
-        rating = (o["rating"] as? JsonPrimitive)?.doubleOrNull?.takeIf { it > 0 },
-        formats = o["formats"].stringList().map { it.uppercase() },
-        timestamp = o["timestamp"].dateOrNull(),
-        lastModified = o["last_modified"].dateOrNull(),
-        pubdate = o["pubdate"].dateOrNull(),
-        comments = o["comments"].stringOrNull(),
-        rawJson = o.toString(),
-    )
-
     companion object {
         private const val BOOKS_PER_REQUEST = 100
 
@@ -189,12 +167,5 @@ class CalibreClient(
     }
 }
 
-private fun JsonElement?.stringOrNull(): String? =
+internal fun JsonElement?.stringOrNull(): String? =
     (this as? JsonPrimitive)?.takeIf { it !is JsonNull && it.isString }?.contentOrNull?.takeIf { it.isNotBlank() }
-
-private fun JsonElement?.stringList(): List<String> =
-    (this as? JsonArray)?.mapNotNull { it.stringOrNull() } ?: emptyList()
-
-/** Calibre sends "None" or a year-101 date for "no date". */
-private fun JsonElement?.dateOrNull(): String? =
-    stringOrNull()?.takeUnless { it == "None" || it.startsWith("0101-") || it.startsWith("0100-") }
