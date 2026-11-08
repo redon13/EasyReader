@@ -122,10 +122,12 @@ class PositionSync(
     }
 }
 
-/** Background task that sends reading positions saved while offline. */
+/** Background task that sends reading positions and shelf/favourite/finished changes saved while offline. */
 class PositionSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val container = (applicationContext as EasyReaderApp).container
-        return if (container.positions.sendPending()) Result.success() else Result.retry()
+        val positionsSent = container.positions.sendPending()
+        val changesSent = container.changes.sendPending()
+        return if (positionsSent && changesSent) Result.success() else Result.retry()
     }
 }

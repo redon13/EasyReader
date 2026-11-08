@@ -1,6 +1,7 @@
 package io.github.redon13.easyreader.data.browse
 
 import io.github.redon13.easyreader.calibre.CalibreBook
+import io.github.redon13.easyreader.calibre.shelves
 import java.text.Normalizer
 import java.util.Locale
 
@@ -30,13 +31,16 @@ data class SortOrder(
     }
 }
 
-enum class FilterCategory(val label: String) {
+enum class FilterCategory(val label: String, val inFiltersTab: Boolean = true) {
     AUTHORS("Authors"),
     SERIES("Series"),
     LANGUAGES("Languages"),
     TAGS("Tags"),
     PUBLISHERS("Publishers"),
-    FORMATS("Formats");
+    FORMATS("Formats"),
+
+    /** The owner's shelves (#er_shelves), shown in the "My shelves" tab instead. */
+    SHELVES("Shelf", inFiltersTab = false);
 
     fun valuesOf(b: CalibreBook): List<String> = when (this) {
         AUTHORS -> b.authors
@@ -45,18 +49,23 @@ enum class FilterCategory(val label: String) {
         TAGS -> b.tags
         PUBLISHERS -> listOfNotNull(b.publisher)
         FORMATS -> b.formats
+        SHELVES -> b.shelves
     }
 }
 
-/** What the owner is looking for: search text, at most one filter per category, and the sort order. */
+/** A smart shelf (Calibre virtual library or saved search) being shown, with its books. */
+data class SmartShelfFilter(val name: String, val bookIds: Set<Int>)
+
+/** What the owner is looking for: search text, at most one filter per category, a smart shelf, and the sort order. */
 data class BrowseQuery(
     val search: String = "",
     val filters: Map<FilterCategory, String> = emptyMap(),
     val sort: SortOrder = SortOrder(),
+    val smartShelf: SmartShelfFilter? = null,
 ) {
     /** True when the library is being narrowed down, rather than showing everything. */
     val isNarrowed: Boolean
-        get() = search.isNotBlank() || filters.isNotEmpty()
+        get() = search.isNotBlank() || filters.isNotEmpty() || smartShelf != null
 }
 
 data class CategoryValue(val value: String, val count: Int)
@@ -68,6 +77,7 @@ object Browse {
         sort(books.filter { matches(it, query) }, query.sort)
 
     fun matches(book: CalibreBook, query: BrowseQuery): Boolean {
+        query.smartShelf?.let { if (book.id !in it.bookIds) return false }
         for ((category, value) in query.filters) {
             if (category.valuesOf(book).none { it.equals(value, ignoreCase = true) }) return false
         }

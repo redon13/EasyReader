@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -39,6 +40,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -51,9 +55,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.CustomColumnValue
 import io.github.redon13.easyreader.calibre.RequiredColumn
+import io.github.redon13.easyreader.calibre.isFavourite
+import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.data.Downloads
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.FilterCategory
+import io.github.redon13.easyreader.ui.browse.AddToShelfSheet
 import io.github.redon13.easyreader.ui.browse.BookCoverImage
 import io.github.redon13.easyreader.ui.browse.BrowseViewModel
 import io.github.redon13.easyreader.ui.browse.ReadingProgressBar
@@ -86,9 +93,14 @@ fun BookDetailsScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 },
                 actions = {
-                    // Favourites come in Stage 4; shown greyed out until then.
-                    IconButton(onClick = {}, enabled = false) {
-                        Icon(Icons.Default.FavoriteBorder, "Favourite (coming soon)", tint = EasyColors.TextMuted.copy(alpha = 0.4f))
+                    if (book != null) {
+                        IconButton(onClick = { vm.toggleFavourite(book) }) {
+                            Icon(
+                                if (book.isFavourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                if (book.isFavourite) "Remove from favourites" else "Add to favourites",
+                                tint = if (book.isFavourite) EasyColors.Accent else EasyColors.Text,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = EasyColors.Background),
@@ -191,6 +203,7 @@ private fun ReadingButtons(vm: BrowseViewModel, book: CalibreBook) {
     val label = when {
         format == null -> "No file to read"
         format !in Downloads.READABLE -> "Open in another app"
+        book.isFinished -> "Read again"
         progress != null && progress > 0.0 -> "Continue reading · ${(progress * 100).toInt()}%"
         else -> "Read"
     }
@@ -211,27 +224,14 @@ private fun ReadingButtons(vm: BrowseViewModel, book: CalibreBook) {
         if (progress != null && progress > 0.0) {
             ReadingProgressBar(progress.toFloat(), Modifier.fillMaxWidth())
         }
+        var showShelves by remember { mutableStateOf(false) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Shelves and finished come in Stage 4; shown greyed out until then.
-            listOf("Add to shelf", "Mark as finished").forEach { text ->
-                OutlinedButton(
-                    onClick = {},
-                    enabled = false,
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, EasyColors.Outline.copy(alpha = 0.4f)),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.weight(1f).height(48.dp),
-                ) {
-                    Text(
-                        text,
-                        color = EasyColors.TextMuted.copy(alpha = 0.6f),
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            SmallButton("Add to shelf", Modifier.weight(1f)) { showShelves = true }
+            SmallButton(if (book.isFinished) "Mark as unread" else "Mark as finished", Modifier.weight(1f)) {
+                vm.setFinished(book, !book.isFinished)
             }
         }
+        if (showShelves) AddToShelfSheet(vm, book, onDismiss = { showShelves = false })
         if (book.id in downloaded) {
             OutlinedButton(
                 onClick = { vm.removeDownload(book.id) },
@@ -240,13 +240,19 @@ private fun ReadingButtons(vm: BrowseViewModel, book: CalibreBook) {
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) { Text("Remove download", color = EasyColors.Text) }
         }
-        Text(
-            "Shelves, favourites and finished arrive in the next update.",
-            style = MaterialTheme.typography.bodySmall,
-            color = EasyColors.TextMuted,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    }
+}
+
+@Composable
+private fun SmallButton(text: String, modifier: Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, EasyColors.Outline),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = modifier.height(48.dp),
+    ) {
+        Text(text, color = EasyColors.Text, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 

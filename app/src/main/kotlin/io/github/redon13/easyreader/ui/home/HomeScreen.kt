@@ -85,9 +85,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.ColumnCheck
 import io.github.redon13.easyreader.calibre.ReadingPosition
+import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.calibre.RequiredColumn
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.FilterCategory
+import io.github.redon13.easyreader.data.browse.SmartShelfFilter
 import io.github.redon13.easyreader.ui.browse.BookCoverImage
 import io.github.redon13.easyreader.ui.browse.BookListRow
 import io.github.redon13.easyreader.ui.browse.BookTile
@@ -116,6 +118,8 @@ fun HomeScreen(
     val sort by vm.sort.collectAsStateWithLifecycle()
     val positions by vm.positions.collectAsStateWithLifecycle()
     val reading by vm.continueReading.collectAsStateWithLifecycle()
+    val favourites by vm.favourites.collectAsStateWithLifecycle()
+    val unread by vm.unread.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val openReader: (Int) -> Unit = { id -> ReaderActivity.open(context, vm.session.libraryId, id) }
     val syncing by vm.syncing.collectAsStateWithLifecycle()
@@ -187,7 +191,7 @@ fun HomeScreen(
                     fullWidth("controls") {
                         Controls(
                             vm = vm,
-                            filterCount = query.filters.size,
+                            filterCount = query.filters.size + (if (query.smartShelf != null) 1 else 0),
                             listView = listView,
                             onFilters = { showFilters = true },
                             onSort = { showSort = true },
@@ -197,15 +201,27 @@ fun HomeScreen(
                         fullWidth("columns") { ColumnBanner(check, onHelp = { showColumnHelp = true }) }
                     }
                     if (query.isNarrowed) {
-                        resultsSection(vm, query.filters, results, listView, positions, onOpenBook)
+                        resultsSection(vm, query.filters, query.smartShelf, results, listView, positions, onOpenBook)
                     } else {
                         if (reading.size > 1) {
                             fullWidth("reading") {
-                                CoverRow("Continue reading", null, reading.map { it.first }, vm, positions, openReader, onSeeAll = null)
+                                CoverRow("Continue reading", null, reading.map { it.first }, vm, positions, openReader) {
+                                    onSeeAll(ListKind.READING)
+                                }
                             }
                         }
                         fullWidth("recent") {
                             CoverRow("Recently added", null, recent, vm, positions, onOpenBook) { onSeeAll(ListKind.RECENT) }
+                        }
+                        if (favourites.isNotEmpty()) {
+                            fullWidth("favourites") {
+                                CoverRow("Favourites", null, favourites, vm, positions, onOpenBook) { onSeeAll(ListKind.FAVOURITES) }
+                            }
+                        }
+                        if (unread.isNotEmpty()) {
+                            fullWidth("unread") {
+                                CoverRow("Unread", null, unread, vm, positions, onOpenBook) { onSeeAll(ListKind.UNREAD) }
+                            }
                         }
                         fullWidth("all") {
                             CoverRow("All books", sort.label, all, vm, positions, onOpenBook) { onSeeAll(ListKind.ALL) }
@@ -231,6 +247,7 @@ private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit
 private fun LazyGridScope.resultsSection(
     vm: BrowseViewModel,
     filters: Map<FilterCategory, String>,
+    smart: SmartShelfFilter?,
     results: List<CalibreBook>,
     listView: Boolean,
     positions: Map<Int, ReadingPosition>,
@@ -238,8 +255,22 @@ private fun LazyGridScope.resultsSection(
 ) {
     fullWidth("active") {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (filters.isNotEmpty()) {
+            if (filters.isNotEmpty() || smart != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (smart != null) {
+                        InputChip(
+                            selected = true,
+                            onClick = vm::clearSmartShelf,
+                            label = { Text("Smart shelf: ${smart.name}") },
+                            trailingIcon = { Icon(Icons.Default.Close, "Remove", Modifier.size(18.dp)) },
+                            colors = InputChipDefaults.inputChipColors(
+                                selectedContainerColor = EasyColors.SurfaceHigh,
+                                selectedLabelColor = EasyColors.Text,
+                                selectedTrailingIconColor = EasyColors.TextMuted,
+                            ),
+                            border = null,
+                        )
+                    }
                     filters.forEach { (category, value) ->
                         val shown = if (category == FilterCategory.LANGUAGES) Browse.languageName(value) else value
                         InputChip(
@@ -284,7 +315,10 @@ private fun LazyGridScope.resultsSection(
     items(results, key = { it.id }) { book ->
         val progress = positions[book.id]?.progress?.toFloat()
         if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
-        else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
+        else BookTile(
+            book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress,
+            onToggleFavourite = { vm.toggleFavourite(book) },
+        )
     }
 }
 
@@ -387,7 +421,8 @@ private fun CoverRow(
                     vm.coverUrl(book),
                     onClick = { onOpenBook(book.id) },
                     modifier = Modifier.width(112.dp),
-                    progress = positions[book.id]?.progress?.toFloat(),
+                    progress = positions[book.id]?.progress?.toFloat()?.takeIf { !book.isFinished },
+                    onToggleFavourite = { vm.toggleFavourite(book) },
                 )
             }
         }

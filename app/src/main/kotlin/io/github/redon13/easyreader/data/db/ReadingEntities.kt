@@ -40,3 +40,26 @@ data class DeviceBookEntity(
     val positionJson: String?,
     val openedAt: Long,
 )
+
+/** A change to a book's custom column (shelves, favourite, finished) waiting to be sent to Calibre. */
+@Entity(tableName = "pending_changes", primaryKeys = ["libraryId", "bookId", "lookupName"])
+data class PendingChangeEntity(
+    val libraryId: String,
+    val bookId: Int,
+    /** e.g. "#er_favourite". */
+    val lookupName: String,
+    /** The new value as JSON (true, false, ["Holiday"], …). */
+    val valueJson: String,
+    val timestamp: Long,
+)
+
+/** A Calibre virtual library or saved search, with the books in it as of the last sync. */
+@Entity(tableName = "smart_shelves", primaryKeys = ["libraryId", "kind", "name"])
+data class SmartShelfEntity(
+    val libraryId: String,
+    /** VIRTUAL_LIBRARY or SAVED_SEARCH. */
+    val kind: String,
+    val name: String,
+    /** Book ids, comma separated. */
+    val bookIds: String,
+)

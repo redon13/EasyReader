@@ -49,4 +49,16 @@ class CalibreBookParserTest {
         val b = book(1)
         assertEquals(b, CalibreBookParser.parse(1, b.rawJson))
     }
+
+    @Test fun `updates a stored value`() {
+        val b = book(2)
+        val raw = CalibreBookParser.withCustomValue(b.rawJson, "#er_favourite", kotlinx.serialization.json.JsonPrimitive(true))
+        val raw2 = CalibreBookParser.withCustomValue(raw, "#er_shelves",
+            kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive("Holiday"))))
+        val updated = CalibreBookParser.parse(2, raw2)
+        assertTrue(updated.isFavourite)
+        assertEquals(listOf("Holiday"), updated.shelves)
+        // Unknown columns are left alone.
+        assertEquals(raw2, CalibreBookParser.withCustomValue(raw2, "#nope", kotlinx.serialization.json.JsonPrimitive(1)))
+    }
 }

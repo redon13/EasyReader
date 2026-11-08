@@ -91,3 +91,20 @@ sealed class CalibreException(message: String, cause: Throwable? = null) : Excep
     class UnexpectedResponse(cause: Throwable?) :
         CalibreException("The server sent something unexpected. Is this address really Calibre's content server?", cause)
 }
+
+/** A Calibre virtual library or saved search, shown in EasyReader as a smart shelf (view only). */
+data class SmartShelf(val name: String, val kind: Kind) {
+    enum class Kind { VIRTUAL_LIBRARY, SAVED_SEARCH }
+}
+
+/** The shelves this book is on (from #er_shelves, as of the last sync). */
+val CalibreBook.shelves: List<String>
+    get() = customColumn(RequiredColumn.SHELVES.lookupName)?.values.orEmpty()
+
+/** Whether the book is a favourite (#er_favourite). */
+val CalibreBook.isFavourite: Boolean
+    get() = customColumn(RequiredColumn.FAVOURITE.lookupName)?.values?.firstOrNull() == "Yes"
+
+/** Whether the book is finished (#er_finished). */
+val CalibreBook.isFinished: Boolean
+    get() = customColumn(RequiredColumn.FINISHED.lookupName)?.values?.firstOrNull() == "Yes"

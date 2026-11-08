@@ -39,6 +39,20 @@ object CalibreBookParser {
         rawJson = o.toString(),
     )
 
+    /**
+     * Returns the stored book JSON with one custom column's value replaced, so a
+     * change shows straight away, before the next sync. Unchanged if the column
+     * doesn't exist in this library.
+     */
+    fun withCustomValue(rawJson: String, lookupName: String, value: JsonElement): String {
+        val book = Json.parseToJsonElement(rawJson).jsonObject
+        val meta = book["user_metadata"] as? JsonObject ?: return rawJson
+        val column = meta[lookupName] as? JsonObject ?: return rawJson
+        val newColumn = JsonObject(column + ("#value#" to value))
+        val newMeta = JsonObject(meta + (lookupName to newColumn))
+        return JsonObject(book + ("user_metadata" to newMeta)).toString()
+    }
+
     private fun parseCustomColumns(meta: JsonObject?): List<CustomColumnValue> {
         if (meta == null) return emptyList()
         return meta.mapNotNull { (lookup, element) ->

@@ -32,14 +32,28 @@ import io.github.redon13.easyreader.ui.theme.EasyColors
 
 /** Which "See all" list to show. */
 enum class ListKind(val title: String) {
+    READING("Continue reading"),
     RECENT("Recently added"),
+    FAVOURITES("Favourites"),
+    UNREAD("Unread"),
     ALL("All books"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookListScreen(vm: BrowseViewModel, kind: ListKind, onBack: () -> Unit, onOpenBook: (Int) -> Unit) {
-    val books by (if (kind == ListKind.RECENT) vm.recentlyAdded else vm.allBooks).collectAsStateWithLifecycle()
+    val reading by vm.continueReading.collectAsStateWithLifecycle()
+    val recent by vm.recentlyAdded.collectAsStateWithLifecycle()
+    val favourites by vm.favourites.collectAsStateWithLifecycle()
+    val unread by vm.unread.collectAsStateWithLifecycle()
+    val all by vm.allBooks.collectAsStateWithLifecycle()
+    val books = when (kind) {
+        ListKind.READING -> reading.map { it.first }
+        ListKind.RECENT -> recent
+        ListKind.FAVOURITES -> favourites
+        ListKind.UNREAD -> unread
+        ListKind.ALL -> all
+    }
     val listView by vm.listView.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
     val positions by vm.positions.collectAsStateWithLifecycle()
@@ -86,7 +100,10 @@ fun BookListScreen(vm: BrowseViewModel, kind: ListKind, onBack: () -> Unit, onOp
             items(books, key = { it.id }) { book ->
                 val progress = positions[book.id]?.progress?.toFloat()
                 if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
-                else BookTile(book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress)
+                else BookTile(
+                    book, vm.coverUrl(book), onClick = { onOpenBook(book.id) }, progress = progress,
+                    onToggleFavourite = { vm.toggleFavourite(book) },
+                )
             }
         }
     }

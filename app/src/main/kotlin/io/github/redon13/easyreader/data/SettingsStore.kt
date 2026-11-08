@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.redon13.easyreader.data.browse.SortField
 import io.github.redon13.easyreader.data.browse.SortOrder
@@ -134,6 +135,16 @@ class SettingsStore(context: Context) {
         }
     }
 
+    /**
+     * Shelves created on this device that have no books yet. Calibre only keeps
+     * a shelf while a book is on it, so these live here until then.
+     */
+    val emptyShelves: Flow<Set<String>> = store.data.map { it[EMPTY_SHELVES].orEmpty() }
+
+    suspend fun updateEmptyShelves(change: (Set<String>) -> Set<String>) {
+        store.edit { it[EMPTY_SHELVES] = change(it[EMPTY_SHELVES].orEmpty()) }
+    }
+
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val USERNAME = stringPreferencesKey("username")
@@ -144,6 +155,7 @@ class SettingsStore(context: Context) {
         val SORT_FIELD = stringPreferencesKey("sort_field")
         val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
         val LIST_VIEW = booleanPreferencesKey("list_view")
+        val EMPTY_SHELVES = stringSetPreferencesKey("empty_shelves")
         val READER_THEME = stringPreferencesKey("reader_theme")
         val READER_FONT_SIZE = doublePreferencesKey("reader_font_size")
         val READER_TYPEFACE = stringPreferencesKey("reader_typeface")
