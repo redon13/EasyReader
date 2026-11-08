@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +77,8 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onGo: (Link) -> Un
     val settings by vm.settings.collectAsStateWithLifecycle()
     var showAa by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
+    val bars by vm.systemBars.collectAsStateWithLifecycle()
+    val topInset = with(LocalDensity.current) { bars.first.toDp() }
     if (state != ReaderState.Ready) return
 
     val theme = settings.theme
@@ -86,7 +87,7 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onGo: (Link) -> Un
             Modifier
                 .fillMaxWidth()
                 .background(theme.bg().copy(alpha = 0.96f))
-                .statusBarsPadding()
+                .padding(top = topInset)
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -121,6 +122,8 @@ fun ReaderBottomBar(vm: ReaderViewModel) {
     val visible by vm.barsVisible.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val locator by vm.locator.collectAsStateWithLifecycle()
+    val bars by vm.systemBars.collectAsStateWithLifecycle()
+    val bottomInset = with(LocalDensity.current) { bars.second.toDp() }
     if (state != ReaderState.Ready) return
 
     val theme = settings.theme
@@ -130,7 +133,7 @@ fun ReaderBottomBar(vm: ReaderViewModel) {
             Modifier
                 .fillMaxWidth()
                 .background(theme.bg().copy(alpha = 0.96f))
-                .navigationBarsPadding()
+                .padding(bottom = bottomInset)
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -210,6 +213,7 @@ private fun AaSheet(vm: ReaderViewModel, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = EasyColors.Sheet,
+        contentColor = EasyColors.Text,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
     ) {
         Column(
@@ -309,6 +313,7 @@ private fun TocSheet(vm: ReaderViewModel, onGo: (Link) -> Unit, onDismiss: () ->
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = EasyColors.Sheet,
+        contentColor = EasyColors.Text,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
     ) {
         Text(

@@ -59,6 +59,7 @@ fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = EasyColors.Sheet,
+        contentColor = EasyColors.Text,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
     ) {
         Column(Modifier.padding(bottom = 16.dp)) {

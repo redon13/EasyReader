@@ -80,6 +80,14 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _barsVisible = MutableStateFlow(true)
     val barsVisible: StateFlow<Boolean> = _barsVisible.asStateFlow()
 
+    /** Heights (in pixels) of Android's status bar and navigation bar, so the reader's bars sit clear of them. */
+    private val _systemBars = MutableStateFlow(0 to 0)
+    val systemBars: StateFlow<Pair<Int, Int>> = _systemBars.asStateFlow()
+
+    fun setSystemBars(top: Int, bottom: Int) {
+        _systemBars.value = top to bottom
+    }
+
     private val _locator = MutableStateFlow<Locator?>(null)
     /** Where the owner is now, for the progress bar. */
     val locator: StateFlow<Locator?> = _locator.asStateFlow()
