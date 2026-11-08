@@ -16,6 +16,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -38,6 +39,7 @@ import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.publication.Locator
 import java.io.File
 
 /**
@@ -68,19 +70,32 @@ class ReaderActivity : AppCompatActivity() {
         root = FrameLayout(this)
         val pages = FragmentContainerView(this).apply { id = R.id.reader_pages }
         val topBar = ComposeView(this).apply {
-            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish, onGo = ::goTo) } }
+            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish) } }
         }
         val bottomBar = ComposeView(this).apply {
-            setContent { EasyReaderTheme { ReaderBottomBar(vm) } }
+            setContent { EasyReaderTheme { ReaderBottomBar(vm, onGo = ::goTo, onGoToPage = ::goToPage) } }
         }
         val status = ComposeView(this).apply {
             setContent { EasyReaderTheme { ReaderStatusScreen(vm, onClose = ::finish) } }
         }
-        root.addView(pages, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        // Leave a strip at the bottom for the "pages left in chapter" footer.
+        root.addView(
+            pages,
+            FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT).apply {
+                bottomMargin = (FOOTER_HEIGHT_DP * resources.displayMetrics.density).toInt()
+            },
+        )
         root.addView(topBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
         root.addView(bottomBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
         root.addView(status, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(root)
+
+        // Remember how tall Android's own bars are, even while they're hidden.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val bars = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            vm.setSystemBars(bars.top, bars.bottom)
+            insets
+        }
 
         vm.start(intent)
 
@@ -154,6 +169,10 @@ class ReaderActivity : AppCompatActivity() {
         navigator?.go(link, animated = false)
     }
 
+    private fun goToPage(locator: Locator) {
+        navigator?.go(locator, animated = false)
+    }
+
     /** For formats EasyReader can't show (e.g. .doc): hand the file to another app. */
     private fun openElsewhere(file: File, format: String) {
         val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
@@ -174,6 +193,7 @@ class ReaderActivity : AppCompatActivity() {
 
     companion object {
         private const val PAGES_TAG = "pages"
+        const val FOOTER_HEIGHT_DP = 28
 
         /** Opens a Calibre book from the library. */
         fun open(context: Context, libraryId: String, bookId: Int) {

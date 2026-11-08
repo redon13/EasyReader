@@ -43,6 +43,7 @@ import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.services.positions
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
@@ -60,6 +61,9 @@ sealed interface ReaderState {
     /** Not EPUB or PDF: hand the downloaded file to another app. */
     data class OpenElsewhere(val file: File, val format: String) : ReaderState
 }
+
+/** Where the owner is, in "pages". EPUBs have no fixed pages, so these are Readium's estimate (about 1,000 letters each). */
+data class PageInfo(val page: Int, val total: Int, val leftInChapter: Int)
 
 /** One entry in the table of contents, with how deeply it's nested. */
 data class TocEntry(val link: Link, val title: String, val depth: Int)
@@ -80,6 +84,14 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _barsVisible = MutableStateFlow(true)
     val barsVisible: StateFlow<Boolean> = _barsVisible.asStateFlow()
 
+    /** Heights (in pixels) of Android's status bar and navigation bar, so the reader's bars sit clear of them. */
+    private val _systemBars = MutableStateFlow(0 to 0)
+    val systemBars: StateFlow<Pair<Int, Int>> = _systemBars.asStateFlow()
+
+    fun setSystemBars(top: Int, bottom: Int) {
+        _systemBars.value = top to bottom
+    }
+
     private val _locator = MutableStateFlow<Locator?>(null)
     /** Where the owner is now, for the progress bar. */
     val locator: StateFlow<Locator?> = _locator.asStateFlow()
@@ -91,6 +103,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     var title: String = ""
         private set
     var toc: List<TocEntry> = emptyList()
+        private set
+    /** Every "page" in the book, in order. */
+    var pages: List<Locator> = emptyList()
         private set
     val isPdf get() = format == "PDF"
 
@@ -204,8 +219,24 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
         publication = pub
         toc = flatten(pub.tableOfContents, 0)
+        pages = pub.positions()
         if (title.isBlank()) title = pub.metadata.title.orEmpty()
         _state.value = ReaderState.Ready
+    }
+
+    /** Page number, total pages and pages left in the chapter for a place in the book. */
+    fun pageInfo(locator: Locator?): PageInfo? {
+        if (pages.isEmpty() || locator == null) return null
+        val index = (locator.locations.position?.minus(1)
+            ?: ((locator.locations.totalProgression ?: 0.0) * pages.size).toInt())
+            .coerceIn(0, pages.lastIndex)
+        val href = pages[index].href
+        var left = 0
+        for (i in index + 1 until pages.size) {
+            if (pages[i].href != href) break
+            left++
+        }
+        return PageInfo(index + 1, pages.size, left)
     }
 
     private fun flatten(links: List<Link>, depth: Int): List<TocEntry> = links.flatMap { link ->

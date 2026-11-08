@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.redon13.easyreader.calibre.CalibreBook
@@ -217,8 +219,17 @@ private fun ReadingButtons(vm: BrowseViewModel, book: CalibreBook) {
                     enabled = false,
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, EasyColors.Outline.copy(alpha = 0.4f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                     modifier = Modifier.weight(1f).height(48.dp),
-                ) { Text(text, color = EasyColors.TextMuted.copy(alpha = 0.6f)) }
+                ) {
+                    Text(
+                        text,
+                        color = EasyColors.TextMuted.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         if (book.id in downloaded) {
