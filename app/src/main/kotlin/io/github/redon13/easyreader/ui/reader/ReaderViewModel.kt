@@ -11,6 +11,7 @@ import io.github.redon13.easyreader.EasyReaderApp
 import io.github.redon13.easyreader.calibre.CalibreBookParser
 import io.github.redon13.easyreader.calibre.CalibreException
 import io.github.redon13.easyreader.calibre.ReadingPosition
+import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.data.Downloads
 import io.github.redon13.easyreader.data.ReaderSettings
 import io.github.redon13.easyreader.data.ReaderTheme
@@ -117,6 +118,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private var bookId: Int? = null
     private var deviceBookHash: String? = null
 
+    /** Whether the book is already marked finished in Calibre (so it's only marked once). */
+    private var finished = true
     private var started = false
     private var lastSentAt = 0L
 
@@ -148,6 +151,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         libraryId = library
         bookId = id
         title = book.title
+        finished = book.isFinished
 
         _state.value = ReaderState.Loading("Downloading…", 0f)
         val file = container.downloads.fileFor(session, book, chosen) { p ->
@@ -330,6 +334,13 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     /** Called whenever the page changes. Saves on the device each time, and sends to Calibre now and then. */
     fun onLocatorChanged(locator: Locator) {
         _locator.value = locator
+        // Reaching 95% marks the book finished (once; "Mark as unread" undoes it).
+        val lib = libraryId
+        val id = bookId
+        if (!finished && lib != null && id != null && (locator.locations.totalProgression ?: 0.0) >= FINISHED_AT) {
+            finished = true
+            container.appScope.launch { container.changes.setFinished(lib, id, true) }
+        }
         val now = System.currentTimeMillis()
         val send = now - lastSentAt > SEND_EVERY_MS
         if (send) lastSentAt = now
@@ -377,5 +388,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
         /** While reading, Calibre is updated at most this often (and always on leaving). */
         private const val SEND_EVERY_MS = 30_000L
+
+        /** How far through a book counts as finished. Will be adjustable in Settings (Stage 5). */
+        private const val FINISHED_AT = 0.95
     }
 }

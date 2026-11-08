@@ -11,12 +11,16 @@ import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.CalibreBookParser
 import io.github.redon13.easyreader.calibre.ColumnCheck
 import io.github.redon13.easyreader.calibre.ReadingPosition
+import io.github.redon13.easyreader.calibre.isFavourite
+import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.calibre.serverPosition
+import io.github.redon13.easyreader.calibre.shelves
 import io.github.redon13.easyreader.data.Session
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.BrowseQuery
 import io.github.redon13.easyreader.data.browse.CategoryValue
 import io.github.redon13.easyreader.data.browse.FilterCategory
+import io.github.redon13.easyreader.data.browse.SmartShelfFilter
 import io.github.redon13.easyreader.data.browse.SortField
 import io.github.redon13.easyreader.data.browse.SortOrder
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +41,7 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     private val sessions = container.sessions
     private val settings = container.settings
     private val downloads = container.downloads
+    private val changes = container.changes
 
     /** All books in the library, or null until the stored copy has been read. */
     val books: StateFlow<List<CalibreBook>?> = repo.books(session.libraryId)
@@ -48,6 +53,7 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     var search by mutableStateOf("")
 
     private val filters = MutableStateFlow<Map<FilterCategory, String>>(emptyMap())
+    private val smartShelf = MutableStateFlow<SmartShelfFilter?>(null)
 
     val sort: StateFlow<SortOrder> = settings.sortOrder
         .stateIn(viewModelScope, SharingStarted.Eagerly, SortOrder())
@@ -55,8 +61,8 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     val listView: StateFlow<Boolean> = settings.listView
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val query: StateFlow<BrowseQuery> = combine(snapshotFlow { search }, filters, sort) { s, f, o ->
-        BrowseQuery(s, f, o)
+    val query: StateFlow<BrowseQuery> = combine(snapshotFlow { search }, filters, sort, smartShelf) { s, f, o, smart ->
+        BrowseQuery(s, f, o, smart)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, BrowseQuery())
 
     /** Books matching the search and filters, in the chosen order. */
@@ -92,11 +98,95 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     /** Books started but not finished, most recently read first. */
     val continueReading: StateFlow<List<Pair<CalibreBook, ReadingPosition>>> = combine(books, positions) { b, p ->
         b.orEmpty()
+            .filter { !it.isFinished }
             .mapNotNull { book -> p[book.id]?.takeIf { it.progress > 0.0 && it.progress < 0.995 }?.let { book to it } }
             .sortedByDescending { it.second.timestamp }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Favourite books, most recently added first. */
+    val favourites: StateFlow<List<CalibreBook>> = recentlyAdded
+        .map { list -> list.filter { it.isFavourite } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Books not started and not finished, most recently added first. */
+    val unread: StateFlow<List<CalibreBook>> = combine(recentlyAdded, positions) { list, p ->
+        list.filter { !it.isFinished && (p[it.id]?.progress ?: 0.0) <= 0.0 }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The owner's shelves with how many books are on each, A to Z (including empty ones made on this device). */
+    val shelves: StateFlow<List<CategoryValue>> = combine(books, settings.emptyShelves) { b, empty ->
+        val counts = Browse.values(b.orEmpty(), FilterCategory.SHELVES).associate { it.value to it.count }
+        (counts.keys + empty).distinctBy { it.lowercase() }
+            .map { CategoryValue(it, counts[it] ?: 0) }
+            .sortedBy { Browse.normalise(it.value) }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Calibre's virtual libraries and saved searches. */
+    val smartShelves: StateFlow<List<SmartShelfFilter>> = repo.smartShelves(session.libraryId)
+        .map { list -> list.map { e -> SmartShelfFilter(e.name, e.bookIds.split(',').mapNotNull { it.toIntOrNull() }.toSet()) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun toggleFavourite(book: CalibreBook) {
+        viewModelScope.launch { changes.setFavourite(session.libraryId, book.id, !book.isFavourite) }
+    }
+
+    fun setFinished(book: CalibreBook, finished: Boolean) {
+        viewModelScope.launch { changes.setFinished(session.libraryId, book.id, finished) }
+    }
+
+    /** Puts the book on exactly these shelves. */
+    fun setShelves(book: CalibreBook, shelves: List<String>) {
+        viewModelScope.launch {
+            changes.setShelves(session.libraryId, book.id, shelves)
+            // A shelf with a book on it is kept by Calibre from now on.
+            settings.updateEmptyShelves { empty -> empty.filterNot { e -> shelves.any { it.equals(e, ignoreCase = true) } }.toSet() }
+        }
+    }
+
+    fun createShelf(name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty() || shelves.value.any { it.value.equals(clean, ignoreCase = true) }) return
+        viewModelScope.launch { settings.updateEmptyShelves { it + clean } }
+    }
+
+    fun renameShelf(old: String, new: String) {
+        val clean = new.trim()
+        if (clean.isEmpty() || clean == old) return
+        viewModelScope.launch {
+            books.value.orEmpty().filter { b -> b.shelves.any { it == old } }.forEach { b ->
+                changes.setShelves(session.libraryId, b.id, b.shelves.map { if (it == old) clean else it })
+            }
+            settings.updateEmptyShelves { empty -> if (old in empty) empty - old + clean else empty }
+            if (filters.value[FilterCategory.SHELVES] == old) setFilter(FilterCategory.SHELVES, clean)
+        }
+    }
+
+    /** Removes the shelf label from every book. The books stay in the library. */
+    fun deleteShelf(name: String) {
+        viewModelScope.launch {
+            books.value.orEmpty().filter { b -> b.shelves.any { it == name } }.forEach { b ->
+                changes.setShelves(session.libraryId, b.id, b.shelves.filter { it != name })
+            }
+            settings.updateEmptyShelves { it - name }
+            if (filters.value[FilterCategory.SHELVES] == name) setFilter(FilterCategory.SHELVES, null)
+        }
+    }
+
+    fun showSmartShelf(shelf: SmartShelfFilter) {
+        search = ""
+        filters.value = emptyMap()
+        smartShelf.value = shelf
+    }
+
+    fun clearSmartShelf() {
+        smartShelf.value = null
+    }
 
     /** Ids of books whose files are on this device. */
     val downloaded: StateFlow<Set<Int>> = downloads.downloadedIds(session.libraryId)
@@ -139,11 +229,13 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
     /** Shows only the books with this value, e.g. everything by one author. */
     fun showOnly(category: FilterCategory, value: String) {
         search = ""
+        smartShelf.value = null
         filters.value = mapOf(category to value)
     }
 
     fun clearSearchAndFilters() {
         search = ""
+        smartShelf.value = null
         filters.value = emptyMap()
     }
 

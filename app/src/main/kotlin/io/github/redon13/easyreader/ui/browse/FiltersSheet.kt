@@ -54,6 +54,7 @@ import io.github.redon13.easyreader.ui.theme.EasyColors
 fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit) {
     val query by vm.query.collectAsStateWithLifecycle()
     var category by remember { mutableStateOf<FilterCategory?>(null) }
+    var tab by remember { mutableStateOf(0) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,32 +65,41 @@ fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit) {
     ) {
         Column(Modifier.padding(bottom = 16.dp)) {
             PrimaryTabRow(
-                selectedTabIndex = 0,
+                selectedTabIndex = tab,
                 containerColor = EasyColors.Sheet,
                 contentColor = EasyColors.Accent,
                 divider = {},
             ) {
-                Tab(selected = true, onClick = {}, text = { Text("Filters") })
-                // Shelves come in Stage 4; shown greyed out until then.
-                Tab(selected = false, onClick = {}, enabled = false, text = { Text("My shelves", color = EasyColors.TextMuted.copy(alpha = 0.5f)) })
-                Tab(selected = false, onClick = {}, enabled = false, text = { Text("Smart shelves", color = EasyColors.TextMuted.copy(alpha = 0.5f)) })
+                listOf("Filters", "My shelves", "Smart shelves").forEachIndexed { i, label ->
+                    Tab(
+                        selected = tab == i,
+                        onClick = { tab = i },
+                        text = { Text(label, color = if (tab == i) EasyColors.Accent else EasyColors.TextMuted) },
+                    )
+                }
             }
             Spacer(Modifier.size(8.dp))
 
-            val current = category
-            if (current == null) {
-                CategoryList(vm, query.filters, onOpen = { category = it })
-            } else {
-                ValueList(
-                    vm = vm,
-                    category = current,
-                    selected = query.filters[current],
-                    onBack = { category = null },
-                    onPick = { value ->
-                        vm.setFilter(current, if (value == query.filters[current]) null else value)
-                        onDismiss()
-                    },
-                )
+            when (tab) {
+                1 -> MyShelvesTab(vm, onDismiss)
+                2 -> SmartShelvesTab(vm, onDismiss)
+                else -> {
+                    val current = category
+                    if (current == null) {
+                        CategoryList(vm, query.filters, onOpen = { category = it })
+                    } else {
+                        ValueList(
+                            vm = vm,
+                            category = current,
+                            selected = query.filters[current],
+                            onBack = { category = null },
+                            onPick = { value ->
+                                vm.setFilter(current, if (value == query.filters[current]) null else value)
+                                onDismiss()
+                            },
+                        )
+                    }
+                }
             }
         }
     }
@@ -98,7 +108,7 @@ fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit) {
 @Composable
 private fun CategoryList(vm: BrowseViewModel, active: Map<FilterCategory, String>, onOpen: (FilterCategory) -> Unit) {
     Column {
-        FilterCategory.entries.forEach { category ->
+        FilterCategory.entries.filter { it.inFiltersTab }.forEach { category ->
             val count = remember(category, active) { vm.categoryValues(category).size }
             Row(
                 Modifier

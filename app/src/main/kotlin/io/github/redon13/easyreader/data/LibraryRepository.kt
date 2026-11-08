@@ -4,6 +4,8 @@ import io.github.redon13.easyreader.calibre.CalibreException
 import io.github.redon13.easyreader.calibre.ColumnCheck
 import io.github.redon13.easyreader.data.db.BookDao
 import io.github.redon13.easyreader.data.db.BookEntity
+import io.github.redon13.easyreader.data.db.ReadingDao
+import io.github.redon13.easyreader.data.db.SmartShelfEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,8 +16,10 @@ import kotlinx.coroutines.sync.withLock
 /** Keeps the on-device copy of the library up to date with Calibre. */
 class LibraryRepository(
     private val books: BookDao,
+    private val reading: ReadingDao,
     private val settings: SettingsStore,
     private val sessions: SessionManager,
+    private val changes: BookChanges,
 ) {
     private val mutex = Mutex()
 
@@ -34,6 +38,9 @@ class LibraryRepository(
 
     fun books(libraryId: String): Flow<List<BookEntity>> = books.observeLibrary(libraryId)
 
+    /** Calibre's virtual libraries and saved searches, with their books (as of the last sync). */
+    fun smartShelves(libraryId: String): Flow<List<SmartShelfEntity>> = reading.observeSmartShelves(libraryId)
+
     /**
      * Downloads the library's details (not the book files) from Calibre.
      * Returns an error message for the owner, or null if it worked.
@@ -50,9 +57,21 @@ class LibraryRepository(
                 return@withLock null
             }
             _columns.value = client.checkColumns(session.libraryId)
+            // Send changes made on this device first, so the fresh copy includes them.
+            changes.sendPending()
             val ids = client.allBookIds(session.libraryId)
             val fetched = client.books(session.libraryId, ids)
             books.replaceLibrary(session.libraryId, fetched.map { BookEntity.from(session.libraryId, it) })
+            val smart = client.smartShelves(session.libraryId).map { shelf ->
+                SmartShelfEntity(
+                    session.libraryId,
+                    shelf.kind.name,
+                    shelf.name,
+                    runCatching { client.smartShelfBookIds(session.libraryId, shelf) }.getOrDefault(emptyList()).joinToString(","),
+                )
+            }
+            reading.deleteSmartShelves(session.libraryId)
+            reading.saveSmartShelves(smart)
             settings.setLastSynced(System.currentTimeMillis())
             null
         } catch (e: CalibreException.WrongLogin) {

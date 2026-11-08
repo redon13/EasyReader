@@ -140,10 +140,21 @@ class CalibreClient(
      * Saves one custom column's value for a book (null clears it). The
      * Calibre user must be allowed to make changes.
      */
-    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, value: String?) {
+    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, value: String?) =
+        setCustomColumn(libraryId, bookId, lookupName, value?.let(::JsonPrimitive) ?: JsonNull)
+
+    /** Saves a Yes/No custom column (null clears it). */
+    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, value: Boolean?) =
+        setCustomColumn(libraryId, bookId, lookupName, value?.let(::JsonPrimitive) ?: JsonNull)
+
+    /** Saves a list column such as #er_shelves. */
+    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, values: List<String>) =
+        setCustomColumn(libraryId, bookId, lookupName, JsonArray(values.map(::JsonPrimitive)))
+
+    suspend fun setCustomColumn(libraryId: String, bookId: Int, lookupName: String, value: JsonElement) {
         val url = url("cdb", "set-fields", bookId.toString(), libraryId)
         val payload = buildJsonObject {
-            put("changes", buildJsonObject { put(lookupName, value?.let(::JsonPrimitive) ?: JsonNull) })
+            put("changes", buildJsonObject { put(lookupName, value) })
             put("loaded_book_ids", JsonArray(emptyList()))
         }
         val request = Request.Builder()
@@ -152,6 +163,37 @@ class CalibreClient(
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
         execute(request) { }
+    }
+
+    /** Calibre's virtual libraries and saved searches, A to Z. */
+    suspend fun smartShelves(libraryId: String): List<SmartShelf> {
+        val init = url("interface-data", "books-init").newBuilder()
+            .addQueryParameter("library_id", libraryId)
+            .addQueryParameter("num", "0")
+            .build()
+        val virtual = (getJson(init).jsonObject["virtual_libraries"] as? JsonObject).orEmpty().keys
+            .map { SmartShelf(it, SmartShelf.Kind.VIRTUAL_LIBRARY) }
+        // Saved searches are a Tag browser category, named "search" (hex encoded in the address).
+        val category = url("ajax", "category", "736561726368", libraryId).newBuilder()
+            .addQueryParameter("num", "10000")
+            .build()
+        val saved = (getJson(category).jsonObject["items"] as? JsonArray).orEmpty()
+            .mapNotNull { (it as? JsonObject)?.get("name").stringOrNull() }
+            .map { SmartShelf(it, SmartShelf.Kind.SAVED_SEARCH) }
+        return (virtual + saved).sortedBy { it.name.lowercase() }
+    }
+
+    /** Ids of the books in a virtual library or saved search. */
+    suspend fun smartShelfBookIds(libraryId: String, shelf: SmartShelf): List<Int> {
+        val b = url("ajax", "search", libraryId).newBuilder()
+            .addQueryParameter("num", Int.MAX_VALUE.toString())
+        when (shelf.kind) {
+            SmartShelf.Kind.VIRTUAL_LIBRARY -> b.addQueryParameter("query", "").addQueryParameter("vl", shelf.name)
+            SmartShelf.Kind.SAVED_SEARCH ->
+                b.addQueryParameter("query", "search:\"=" + shelf.name.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+        }
+        val ids = getJson(b.build()).jsonObject["book_ids"]?.jsonArray ?: throw CalibreException.UnexpectedResponse(null)
+        return ids.mapNotNull { (it as? JsonPrimitive)?.intOrNull }
     }
 
     /**

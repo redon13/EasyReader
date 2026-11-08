@@ -53,6 +53,12 @@ class BrowseTest {
         assertEquals(listOf(3, 4, 1, 2), ids(BrowseQuery(sort = SortOrder(SortField.SERIES, descending = true))))
     }
 
+    @Test fun `smart shelves limit the books`() {
+        val q = BrowseQuery(smartShelf = SmartShelfFilter("Sci-fi", setOf(3, 4)))
+        assertEquals(listOf(3, 4), ids(q).sorted())
+        assertEquals(listOf(4), ids(q.copy(search = "dune")).filter { it == 4 })
+    }
+
     @Test fun `counts values in a category`() {
         assertEquals(
             listOf(CategoryValue("Classic", 2), CategoryValue("Gothic", 1)),

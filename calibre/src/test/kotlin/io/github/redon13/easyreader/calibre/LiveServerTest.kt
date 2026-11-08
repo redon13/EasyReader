@@ -47,6 +47,23 @@ class LiveServerTest {
         assertTrue(saved!!.timestamp == pos.timestamp)
         client.setCustomColumn(lib, first.id, ReadingPosition.COLUMN, before)
 
+        // Shelves and favourite: save, read back, restore.
+        val oldShelves = first.shelves
+        val oldFavourite = first.isFavourite
+        client.setCustomColumn(lib, first.id, RequiredColumn.SHELVES.lookupName, listOf("Test shelf", "Another"))
+        client.setCustomColumn(lib, first.id, RequiredColumn.FAVOURITE.lookupName, !oldFavourite)
+        val changed = client.book(lib, first.id)!!
+        println("Shelves: ${changed.shelves}, favourite: ${changed.isFavourite}")
+        assertTrue(changed.shelves.toSet() == setOf("Test shelf", "Another"))
+        assertTrue(changed.isFavourite == !oldFavourite)
+        client.setCustomColumn(lib, first.id, RequiredColumn.SHELVES.lookupName, oldShelves)
+        client.setCustomColumn(lib, first.id, RequiredColumn.FAVOURITE.lookupName, oldFavourite)
+
+        // Smart shelves (virtual libraries and saved searches).
+        client.smartShelves(lib).forEach { shelf ->
+            println("Smart shelf: $shelf -> ${client.smartShelfBookIds(lib, shelf)}")
+        }
+
         // Download the first book that has a file.
         books.firstOrNull { it.formats.isNotEmpty() }?.let { b ->
             val dest = java.io.File.createTempFile("live", "." + b.formats.first().lowercase())

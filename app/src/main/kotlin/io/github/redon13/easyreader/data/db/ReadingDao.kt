@@ -50,4 +50,27 @@ interface ReadingDao {
 
     @Query("UPDATE device_books SET positionJson = :json WHERE hash = :hash")
     suspend fun saveDeviceBookPosition(hash: String, json: String)
+
+    // Changes waiting to be sent to Calibre
+
+    @Query("SELECT * FROM pending_changes ORDER BY timestamp")
+    suspend fun pendingChanges(): List<PendingChangeEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun savePendingChange(change: PendingChangeEntity)
+
+    /** Removes a sent change, unless a newer one for the same column was saved meanwhile. */
+    @Query("DELETE FROM pending_changes WHERE libraryId = :libraryId AND bookId = :bookId AND lookupName = :lookupName AND timestamp = :timestamp")
+    suspend fun deletePendingChange(libraryId: String, bookId: Int, lookupName: String, timestamp: Long)
+
+    // Smart shelves
+
+    @Query("SELECT * FROM smart_shelves WHERE libraryId = :libraryId ORDER BY name COLLATE NOCASE")
+    fun observeSmartShelves(libraryId: String): Flow<List<SmartShelfEntity>>
+
+    @Query("DELETE FROM smart_shelves WHERE libraryId = :libraryId")
+    suspend fun deleteSmartShelves(libraryId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveSmartShelves(shelves: List<SmartShelfEntity>)
 }

@@ -22,6 +22,9 @@ interface BookDao {
     @Query("DELETE FROM books")
     suspend fun deleteAll()
 
+    @Query("SELECT * FROM books WHERE libraryId = :libraryId")
+    suspend fun library(libraryId: String): List<BookEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(books: List<BookEntity>)
 

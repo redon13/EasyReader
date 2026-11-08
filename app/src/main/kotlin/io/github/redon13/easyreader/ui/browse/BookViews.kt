@@ -11,7 +11,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.redon13.easyreader.calibre.CalibreBook
+import io.github.redon13.easyreader.calibre.isFavourite
+import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.ui.theme.EasyColors
 
 /** A book cover (2:3) with the title shown underneath while it loads or if there's no cover. */
@@ -83,9 +93,16 @@ fun BookTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    onToggleFavourite: (() -> Unit)? = null,
 ) {
     Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick)) {
-        BookCoverImage(book, coverUrl, Modifier.fillMaxWidth())
+        Box {
+            BookCoverImage(book, coverUrl, Modifier.fillMaxWidth())
+            if (book.isFinished) FinishedBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
+            if (onToggleFavourite != null) {
+                FavouriteButton(book.isFavourite, onToggleFavourite, Modifier.align(Alignment.TopEnd))
+            }
+        }
         if (progress != null) {
             Spacer(Modifier.height(6.dp))
             ReadingProgressBar(progress, Modifier.fillMaxWidth())
@@ -106,6 +123,35 @@ fun BookTile(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/** Heart in the corner of a cover: tap to add to or remove from favourites. */
+@Composable
+fun FavouriteButton(favourite: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick = onToggle, modifier = modifier.size(40.dp)) {
+        Box(
+            Modifier.size(30.dp).background(Color.Black.copy(alpha = 0.45f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (favourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (favourite) "Remove from favourites" else "Add to favourites",
+                tint = if (favourite) EasyColors.Accent else Color.White,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/** Small ✓ on the cover of a finished book. */
+@Composable
+fun FinishedBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier.size(24.dp).background(EasyColors.Success, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Default.Check, contentDescription = "Finished", tint = EasyColors.OnAccent, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -140,9 +186,10 @@ fun BookListRow(
                 )
             }
             val extra = listOfNotNull(
+                if (book.isFinished) "Finished" else null,
                 seriesText(book),
                 book.formats.joinToString(" · ").ifEmpty { null },
-                progress?.let { "${(it * 100).toInt()}% read" },
+                progress?.takeIf { !book.isFinished }?.let { "${(it * 100).toInt()}% read" },
             )
             if (extra.isNotEmpty()) {
                 Text(
