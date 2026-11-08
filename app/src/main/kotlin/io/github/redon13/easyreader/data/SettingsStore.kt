@@ -37,8 +37,12 @@ enum class ReaderTypeface(val label: String) {
     ORIGINAL("Book's own"),
 }
 
+/** How pages turn: sliding sideways, or curling like paper. */
+enum class PageTurn(val label: String) { SLIDE("Slide"), CURL("Curl") }
+
 data class ReaderSettings(
     val theme: ReaderTheme = ReaderTheme.WHITE,
+    val pageTurn: PageTurn = PageTurn.SLIDE,
     /** 1.0 is the normal size; the design's default (20 sp) is a little larger. */
     val fontSize: Double = 1.2,
     val typeface: ReaderTypeface = ReaderTypeface.ALEGREYA,
@@ -141,6 +145,7 @@ class SettingsStore(context: Context) {
             theme = p[READER_THEME]?.let { n -> ReaderTheme.entries.firstOrNull { it.name == n } } ?: ReaderTheme.WHITE,
             fontSize = p[READER_FONT_SIZE] ?: 1.2,
             typeface = p[READER_TYPEFACE]?.let { n -> ReaderTypeface.entries.firstOrNull { it.name == n } } ?: ReaderTypeface.ALEGREYA,
+            pageTurn = p[READER_PAGE_TURN]?.let { n -> PageTurn.entries.firstOrNull { it.name == n } } ?: PageTurn.SLIDE,
         )
     }
 
@@ -149,6 +154,7 @@ class SettingsStore(context: Context) {
             it[READER_THEME] = settings.theme.name
             it[READER_FONT_SIZE] = settings.fontSize
             it[READER_TYPEFACE] = settings.typeface.name
+            it[READER_PAGE_TURN] = settings.pageTurn.name
         }
     }
 
@@ -217,6 +223,7 @@ class SettingsStore(context: Context) {
         val READER_THEME = stringPreferencesKey("reader_theme")
         val READER_FONT_SIZE = doublePreferencesKey("reader_font_size")
         val READER_TYPEFACE = stringPreferencesKey("reader_typeface")
+        val READER_PAGE_TURN = stringPreferencesKey("reader_page_turn")
     }
 }
 

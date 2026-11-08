@@ -22,6 +22,7 @@ import io.github.redon13.easyreader.data.ReaderTypeface
 import io.github.redon13.easyreader.data.SessionState
 import io.github.redon13.easyreader.data.db.DeviceBookEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -50,6 +51,8 @@ import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.positions
+import org.readium.r2.shared.publication.services.search.isSearchable
+import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
@@ -70,6 +73,9 @@ sealed interface ReaderState {
 
 /** Where the owner is, in "pages". EPUBs have no fixed pages, so these are Readium's estimate (about 1,000 letters each). */
 data class PageInfo(val page: Int, val total: Int, val leftInChapter: Int)
+
+/** One place where the searched words were found. */
+data class SearchHit(val locator: Locator, val before: String, val match: String, val after: String, val chapter: String?)
 
 /** One entry in the table of contents, with how deeply it's nested. */
 data class TocEntry(val link: Link, val title: String, val depth: Int)
@@ -372,6 +378,50 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- Search inside the book (EPUB only) ----------------------------------
+
+    private val _searchHits = MutableStateFlow<List<SearchHit>>(emptyList())
+    val searchHits: StateFlow<List<SearchHit>> = _searchHits.asStateFlow()
+    private val _searching = MutableStateFlow(false)
+    val searching: StateFlow<Boolean> = _searching.asStateFlow()
+    private var searchJob: Job? = null
+
+    @OptIn(ExperimentalReadiumApi::class)
+    val canSearch: Boolean get() = publication?.isSearchable == true
+
+    /** Finds every place the words appear (up to [MAX_HITS]), adding results as they're found. */
+    @OptIn(ExperimentalReadiumApi::class)
+    fun search(query: String) {
+        searchJob?.cancel()
+        _searchHits.value = emptyList()
+        val pub = publication
+        if (query.isBlank() || pub == null) {
+            _searching.value = false
+            return
+        }
+        searchJob = viewModelScope.launch {
+            _searching.value = true
+            val iterator = pub.search(query.trim())
+            try {
+                while (iterator != null && _searchHits.value.size < MAX_HITS) {
+                    val page = iterator.next().getOrNull() ?: break
+                    _searchHits.value = _searchHits.value + page.locators.map { l ->
+                        SearchHit(
+                            locator = l,
+                            before = l.text.before.orEmpty().takeLast(60).trimStart(),
+                            match = l.text.highlight.orEmpty(),
+                            after = l.text.after.orEmpty().take(60).trimEnd(),
+                            chapter = l.title,
+                        )
+                    }
+                }
+            } finally {
+                iterator?.close()
+                _searching.value = false
+            }
+        }
+    }
+
     fun toggleBars() {
         _barsVisible.value = !_barsVisible.value
     }
@@ -439,6 +489,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
         /** While reading, Calibre is updated at most this often (and always on leaving). */
         private const val SEND_EVERY_MS = 30_000L
+        private const val MAX_HITS = 500
 
     }
 }

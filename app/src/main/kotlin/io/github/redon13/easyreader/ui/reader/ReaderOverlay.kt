@@ -26,6 +26,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.redon13.easyreader.data.PageTurn
 import io.github.redon13.easyreader.data.ReaderTheme
 import io.github.redon13.easyreader.data.ReaderTypeface
 import io.github.redon13.easyreader.ui.theme.Alegreya
@@ -74,11 +89,12 @@ private fun ReaderTheme.muted() = Color(secondary)
 
 /** Top bar (back, title, Aa) plus the Aa panel. */
 @Composable
-fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit) {
+fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onSearchResult: (Locator) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val visible by vm.barsVisible.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     var showAa by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     val bars by vm.systemBars.collectAsStateWithLifecycle()
     val topInset = with(LocalDensity.current) { bars.first.toDp() }
     if (state != ReaderState.Ready) return
@@ -108,6 +124,9 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit) {
                     Text(if (adding) "Adding…" else "Add to Calibre", color = EasyColors.Accent)
                 }
             }
+            if (vm.canSearch) {
+                IconButton(onClick = { showSearch = true }) { Icon(Icons.Default.Search, "Search in book", tint = theme.fg()) }
+            }
             TextButton(onClick = { showAa = true }) {
                 Text("Aa", fontFamily = Alegreya, fontSize = 22.sp, color = theme.fg())
             }
@@ -115,6 +134,88 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit) {
     }
 
     if (showAa) AaSheet(vm, onDismiss = { showAa = false })
+    if (showSearch) {
+        SearchSheet(
+            vm,
+            onPick = { showSearch = false; vm.hideBars(); onSearchResult(it) },
+            onDismiss = { showSearch = false },
+        )
+    }
+}
+
+/** Search inside the book: type words, see each place they appear, tap to go there. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchSheet(vm: ReaderViewModel, onPick: (Locator) -> Unit, onDismiss: () -> Unit) {
+    val hits by vm.searchHits.collectAsStateWithLifecycle()
+    val searching by vm.searching.collectAsStateWithLifecycle()
+    var query by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = EasyColors.Sheet,
+        contentColor = EasyColors.Text,
+        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp)) {
+            TextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search in this book", color = EasyColors.TextMuted) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = EasyColors.TextMuted) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),
+                shape = RoundedCornerShape(14.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = EasyColors.SheetChip,
+                    unfocusedContainerColor = EasyColors.SheetChip,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = EasyColors.Accent,
+                ),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    searching -> "Searching… ${hits.size} found"
+                    hits.isEmpty() && query.isNotBlank() -> "Press search on the keyboard to look."
+                    hits.isNotEmpty() -> if (hits.size == 1) "1 result" else "${hits.size} results"
+                    else -> ""
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = EasyColors.TextMuted,
+            )
+            LazyColumn(Modifier.heightIn(max = 520.dp)) {
+                itemsIndexed(hits) { _, hit ->
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(hit.locator) }
+                            .padding(vertical = 10.dp),
+                    ) {
+                        hit.chapter?.let {
+                            Text(it, style = MaterialTheme.typography.labelSmall, color = EasyColors.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text(
+                            buildAnnotatedString {
+                                append("…" + hit.before)
+                                withStyle(SpanStyle(color = EasyColors.Accent, fontWeight = FontWeight.Bold)) { append(hit.match) }
+                                append(hit.after + "…")
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -316,6 +417,24 @@ private fun AaSheet(vm: ReaderViewModel, onDismiss: () -> Unit) {
                                 },
                             )
                         },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = EasyColors.SheetChip,
+                            labelColor = EasyColors.Text,
+                            selectedContainerColor = EasyColors.Accent,
+                            selectedLabelColor = EasyColors.OnAccent,
+                        ),
+                        border = null,
+                    )
+                }
+            }
+
+            Text("Page turn", style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PageTurn.entries.forEach { turn ->
+                    FilterChip(
+                        selected = settings.pageTurn == turn,
+                        onClick = { vm.updateSettings { it.copy(pageTurn = turn) } },
+                        label = { Text(turn.label) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = EasyColors.SheetChip,
                             labelColor = EasyColors.Text,
