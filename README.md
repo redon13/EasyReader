@@ -47,5 +47,5 @@ Design approved 7 November 2026.
 | 1 | Project skeleton, automatic builds and signed releases, connect to the server, sign in, library as covers | Done (v0.1.0) |
 | 2 | Browse, search, filters, sort and book details | Done (v0.2.0) |
 | 3 | Reader, offline downloads, reading position sync, opening EPUB/PDF files from the device | Done (v0.3.1) |
-| 4 | Shelves, favourites, finished status, smart shelves | Built, ready for testing (v0.4.0) |
+| 4 | Shelves, favourites, finished status, smart shelves | Built, ready for testing (v0.4.1) |
 | 5 | Uploads, settings, tablet layout, clean-up, polish | Not started |

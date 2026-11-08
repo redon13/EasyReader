@@ -62,16 +62,19 @@ class LibraryRepository(
             val ids = client.allBookIds(session.libraryId)
             val fetched = client.books(session.libraryId, ids)
             books.replaceLibrary(session.libraryId, fetched.map { BookEntity.from(session.libraryId, it) })
-            val smart = client.smartShelves(session.libraryId).map { shelf ->
-                SmartShelfEntity(
-                    session.libraryId,
-                    shelf.kind.name,
-                    shelf.name,
-                    runCatching { client.smartShelfBookIds(session.libraryId, shelf) }.getOrDefault(emptyList()).joinToString(","),
-                )
+            // Smart shelves are extra: a problem reading them never stops the sync.
+            runCatching {
+                val smart = client.smartShelves(session.libraryId).map { shelf ->
+                    SmartShelfEntity(
+                        session.libraryId,
+                        shelf.kind.name,
+                        shelf.name,
+                        runCatching { client.smartShelfBookIds(session.libraryId, shelf) }.getOrDefault(emptyList()).joinToString(","),
+                    )
+                }
+                reading.deleteSmartShelves(session.libraryId)
+                reading.saveSmartShelves(smart)
             }
-            reading.deleteSmartShelves(session.libraryId)
-            reading.saveSmartShelves(smart)
             settings.setLastSynced(System.currentTimeMillis())
             null
         } catch (e: CalibreException.WrongLogin) {

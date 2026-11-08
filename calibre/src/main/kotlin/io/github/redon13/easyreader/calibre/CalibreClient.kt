@@ -177,7 +177,13 @@ class CalibreClient(
         val category = url("ajax", "category", "736561726368", libraryId).newBuilder()
             .addQueryParameter("num", "10000")
             .build()
-        val saved = (getJson(category).jsonObject["items"] as? JsonArray).orEmpty()
+        // Calibre answers "not found" when the library has no saved searches at all.
+        val savedJson = try {
+            getJson(category)
+        } catch (e: CalibreException.NotAllowed) {
+            null
+        }
+        val saved = (savedJson?.jsonObject?.get("items") as? JsonArray).orEmpty()
             .mapNotNull { (it as? JsonObject)?.get("name").stringOrNull() }
             .map { SmartShelf(it, SmartShelf.Kind.SAVED_SEARCH) }
         return (virtual + saved).sortedBy { it.name.lowercase() }

@@ -95,4 +95,11 @@ class CalibreClientTest {
         assertEquals(listOf(RequiredColumn.FINISHED), check.missing)
         assertEquals(listOf(RequiredColumn.FAVOURITE), check.wrongType)
     }
+
+    @Test fun `smart shelves work without saved searches`() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"virtual_libraries": {"Sci-fi": "tags:scifi"}}"""))
+        server.enqueue(MockResponse().setResponseCode(404).setBody("Category 'search' not found"))
+        val shelves = client().smartShelves("lib")
+        assertEquals(listOf(SmartShelf("Sci-fi", SmartShelf.Kind.VIRTUAL_LIBRARY)), shelves)
+    }
 }
