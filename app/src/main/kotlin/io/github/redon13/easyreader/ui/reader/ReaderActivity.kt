@@ -27,10 +27,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.redon13.easyreader.R
+import io.github.redon13.easyreader.data.PageTurn
 import io.github.redon13.easyreader.data.ReaderSettings
 import io.github.redon13.easyreader.ui.theme.EasyReaderTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.readium.adapter.pdfium.navigator.PdfiumNavigatorFragment
+import org.readium.r2.navigator.DecorableNavigator
+import org.readium.r2.navigator.Decoration
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.VisualNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
@@ -51,6 +55,7 @@ class ReaderActivity : AppCompatActivity() {
     private val vm: ReaderViewModel by viewModels()
     private var navigator: VisualNavigator? = null
     private lateinit var root: FrameLayout
+    private lateinit var curl: PageCurlLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // After a rotation the book is still open: Android can rebuild the page
@@ -68,9 +73,12 @@ class ReaderActivity : AppCompatActivity() {
         )
 
         root = FrameLayout(this)
-        val pages = FragmentContainerView(this).apply { id = R.id.reader_pages }
+        // The pages sit inside the page-curl layer, which can turn them like paper.
+        curl = PageCurlLayout(this, window)
+        curl.addView(FragmentContainerView(this).apply { id = R.id.reader_pages }, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        val pages = curl
         val topBar = ComposeView(this).apply {
-            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish) } }
+            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish, onSearchResult = ::goToSearchResult) } }
         }
         val bottomBar = ComposeView(this).apply {
             setContent { EasyReaderTheme { ReaderBottomBar(vm, onGo = ::goTo, onGoToPage = ::goToPage) } }
@@ -130,7 +138,23 @@ class ReaderActivity : AppCompatActivity() {
         navigator = nav
 
         // Tap the left or right edge to turn the page; tap the middle to show or hide the bars.
-        (nav as? OverflowableNavigator)?.let { nav.addInputListener(DirectionalNavigationAdapter(it, animatedTransition = true)) }
+        // With page curl on, edge taps curl the page instead of sliding it.
+        (nav as? OverflowableNavigator)?.let { overflowable ->
+            curl.navigator = overflowable
+            nav.addInputListener(object : InputListener {
+                override fun onTap(event: TapEvent): Boolean {
+                    if (!curl.curlEnabled) return false
+                    if (curl.isTurning) return true
+                    val w = curl.width.toFloat()
+                    return when {
+                        event.point.x > w * 0.7f -> { curl.animateTurn(forward = true); true }
+                        event.point.x < w * 0.3f -> { curl.animateTurn(forward = false); true }
+                        else -> false
+                    }
+                }
+            })
+            nav.addInputListener(DirectionalNavigationAdapter(overflowable, animatedTransition = true))
+        }
         nav.addInputListener(object : InputListener {
             override fun onTap(event: TapEvent): Boolean {
                 vm.toggleBars()
@@ -157,6 +181,8 @@ class ReaderActivity : AppCompatActivity() {
             isAppearanceLightNavigationBars = !dark
         }
         (navigator as? EpubNavigatorFragment)?.submitPreferences(vm.epubPreferences(settings))
+        curl.curlEnabled = settings.pageTurn == PageTurn.CURL
+        curl.paperColor = settings.theme.background.toInt()
     }
 
     private fun showSystemBars(show: Boolean) {
@@ -168,6 +194,21 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun goTo(link: Link) {
         navigator?.go(link, animated = false)
+    }
+
+    /** Goes to a search result and highlights the words for a few seconds. */
+    private fun goToSearchResult(locator: Locator) {
+        val nav = navigator ?: return
+        nav.go(locator, animated = false)
+        val decorable = nav as? DecorableNavigator ?: return
+        lifecycleScope.launch {
+            decorable.applyDecorations(
+                listOf(Decoration("search", locator, Decoration.Style.Highlight(tint = 0x99F2A23A.toInt()))),
+                "search",
+            )
+            delay(4_000)
+            decorable.applyDecorations(emptyList(), "search")
+        }
     }
 
     private fun goToPage(locator: Locator) {
