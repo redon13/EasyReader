@@ -15,6 +15,8 @@ import io.github.redon13.easyreader.calibre.isFavourite
 import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.calibre.serverPosition
 import io.github.redon13.easyreader.calibre.shelves
+import io.github.redon13.easyreader.data.AppSettings
+import io.github.redon13.easyreader.data.ReaderSettings
 import io.github.redon13.easyreader.data.Session
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.BrowseQuery
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -247,9 +250,38 @@ class BrowseViewModel(container: AppContainer, val session: Session) : ViewModel
         viewModelScope.launch { settings.saveListView(list) }
     }
 
+    val appSettings: StateFlow<AppSettings> = settings.appSettings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
+
+    fun updateAppSettings(change: (AppSettings) -> AppSettings) {
+        viewModelScope.launch { settings.saveAppSettings(change(appSettings.value)) }
+    }
+
+    /** Syncs if automatic sync is on and the last sync was more than [maxAgeMs] ago. */
+    fun syncIfDue(maxAgeMs: Long) {
+        viewModelScope.launch {
+            if (!appSettings.value.autoSync || repo.syncing.value) return@launch
+            val last = repo.lastSynced.first() ?: 0L
+            if (System.currentTimeMillis() - last >= maxAgeMs) sync()
+        }
+    }
+
+    /** The problem from the last sync, or null if it worked. */
+    private val _syncError = MutableStateFlow<String?>(null)
+    val syncError: StateFlow<String?> = _syncError
+
+    val readerSettings: StateFlow<ReaderSettings> = settings.readerSettings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ReaderSettings())
+
+    fun updateReaderSettings(change: (ReaderSettings) -> ReaderSettings) {
+        viewModelScope.launch { settings.saveReaderSettings(change(readerSettings.value)) }
+    }
+
     fun sync() {
         viewModelScope.launch {
-            repo.sync(session)?.let { _messages.tryEmit("Couldn't sync: $it") }
+            val error = repo.sync(session)
+            _syncError.value = error
+            error?.let { _messages.tryEmit("Couldn't sync: $it") }
         }
     }
 

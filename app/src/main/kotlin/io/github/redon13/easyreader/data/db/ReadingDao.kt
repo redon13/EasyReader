@@ -37,6 +37,12 @@ interface ReadingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveDownload(download: DownloadEntity)
 
+    @Query("SELECT * FROM downloads")
+    suspend fun allDownloads(): List<DownloadEntity>
+
+    @Query("UPDATE downloads SET finishedSeenAt = :time WHERE libraryId = :libraryId AND bookId = :bookId")
+    suspend fun setFinishedSeenAt(libraryId: String, bookId: Int, time: Long?)
+
     @Query("DELETE FROM downloads WHERE libraryId = :libraryId AND bookId = :bookId")
     suspend fun deleteDownload(libraryId: String, bookId: Int)
 

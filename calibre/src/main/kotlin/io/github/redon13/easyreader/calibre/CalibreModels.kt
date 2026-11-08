@@ -108,3 +108,14 @@ val CalibreBook.isFavourite: Boolean
 /** Whether the book is finished (#er_finished). */
 val CalibreBook.isFinished: Boolean
     get() = customColumn(RequiredColumn.FINISHED.lookupName)?.values?.firstOrNull() == "Yes"
+
+/** What happened when a book file was sent to Calibre. */
+sealed interface UploadResult {
+    val title: String
+    val authors: List<String>
+
+    data class Added(val bookId: Int, override val title: String, override val authors: List<String>) : UploadResult
+
+    /** Calibre already had this book, so it wasn't added again. */
+    data class Duplicate(override val title: String, override val authors: List<String>) : UploadResult
+}

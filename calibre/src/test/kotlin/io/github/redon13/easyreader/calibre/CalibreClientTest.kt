@@ -102,4 +102,21 @@ class CalibreClientTest {
         val shelves = client().smartShelves("lib")
         assertEquals(listOf(SmartShelf("Sci-fi", SmartShelf.Kind.VIRTUAL_LIBRARY)), shelves)
     }
+
+    @Test fun `uploads a book and reports duplicates`() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"title": "Emma", "authors": ["Jane Austen"], "book_id": 42}"""))
+        server.enqueue(MockResponse().setBody("""{"title": "Emma", "authors": ["Jane Austen"], "duplicates": [{"title": "Emma"}]}"""))
+        val bytes = "EPUBDATA".toByteArray()
+        val c = client()
+        val progress = mutableListOf<Float?>()
+        val first = c.uploadBook("lib", "Emma (2).epub", bytes.size.toLong(), { bytes.inputStream() }) { progress += it }
+        assertEquals(UploadResult.Added(42, "Emma", listOf("Jane Austen")), first)
+        assertEquals(1f, progress.last())
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertTrue(request.path!!, request.path!!.matches(Regex("/cdb/add-book/\\d+/n/Emma%20\\(2\\)\\.epub/lib")))
+        assertEquals("EPUBDATA", request.body.readUtf8())
+        val second = c.uploadBook("lib", "Emma.epub", null, { bytes.inputStream() })
+        assertTrue(second is UploadResult.Duplicate)
+    }
 }

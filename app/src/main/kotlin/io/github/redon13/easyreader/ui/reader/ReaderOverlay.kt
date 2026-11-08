@@ -102,6 +102,12 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (vm.canAddToCalibre) {
+                val adding by vm.addingToCalibre.collectAsStateWithLifecycle()
+                TextButton(onClick = vm::addToCalibre, enabled = !adding) {
+                    Text(if (adding) "Adding…" else "Add to Calibre", color = EasyColors.Accent)
+                }
+            }
             TextButton(onClick = { showAa = true }) {
                 Text("Aa", fontFamily = Alegreya, fontSize = 22.sp, color = theme.fg())
             }
