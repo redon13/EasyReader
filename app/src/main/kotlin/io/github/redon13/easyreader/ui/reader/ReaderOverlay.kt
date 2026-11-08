@@ -37,6 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,20 +65,20 @@ import io.github.redon13.easyreader.ui.theme.Alegreya
 import io.github.redon13.easyreader.ui.theme.AlegreyaSans
 import io.github.redon13.easyreader.ui.theme.EasyColors
 import org.readium.r2.shared.publication.Link
+import org.readium.r2.shared.publication.Locator
 import kotlin.math.roundToInt
 
 private fun ReaderTheme.bg() = Color(background)
 private fun ReaderTheme.fg() = Color(text)
 private fun ReaderTheme.muted() = Color(secondary)
 
-/** Top bar (back, title, contents, Aa) plus the Aa and contents panels. */
+/** Top bar (back, title, Aa) plus the Aa panel. */
 @Composable
-fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onGo: (Link) -> Unit) {
+fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val visible by vm.barsVisible.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     var showAa by remember { mutableStateOf(false) }
-    var showToc by remember { mutableStateOf(false) }
     val bars by vm.systemBars.collectAsStateWithLifecycle()
     val topInset = with(LocalDensity.current) { bars.first.toDp() }
     if (state != ReaderState.Ready) return
@@ -100,11 +102,6 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onGo: (Link) -> Un
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (vm.toc.isNotEmpty()) {
-                IconButton(onClick = { showToc = true }) {
-                    Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = theme.fg())
-                }
-            }
             TextButton(onClick = { showAa = true }) {
                 Text("Aa", fontFamily = Alegreya, fontSize = 22.sp, color = theme.fg())
             }
@@ -112,52 +109,103 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onGo: (Link) -> Un
     }
 
     if (showAa) AaSheet(vm, onDismiss = { showAa = false })
-    if (showToc) TocSheet(vm, onGo = { showToc = false; vm.hideBars(); onGo(it) }, onDismiss = { showToc = false })
 }
 
-/** Bottom bar: chapter, thin progress bar and %. */
+/**
+ * Bottom of the screen. With the bars showing: contents button, a slider to
+ * move through the book, and "page / total" (like Play Books). Otherwise a
+ * small footer: "19 pages left in chapter · 40%".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderBottomBar(vm: ReaderViewModel) {
+fun ReaderBottomBar(vm: ReaderViewModel, onGo: (Link) -> Unit, onGoToPage: (Locator) -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val visible by vm.barsVisible.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val locator by vm.locator.collectAsStateWithLifecycle()
     val bars by vm.systemBars.collectAsStateWithLifecycle()
     val bottomInset = with(LocalDensity.current) { bars.second.toDp() }
+    var showToc by remember { mutableStateOf(false) }
     if (state != ReaderState.Ready) return
 
     val theme = settings.theme
-    val progress = (locator?.locations?.totalProgression ?: 0.0).toFloat().coerceIn(0f, 1f)
-    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(theme.bg().copy(alpha = 0.96f))
-                .padding(bottom = bottomInset)
-                .padding(horizontal = 20.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+    val percent = ((locator?.locations?.totalProgression ?: 0.0) * 100).roundToInt()
+    val info = vm.pageInfo(locator)
+
+    // While dragging the slider, the page number follows the finger; the jump happens on release.
+    var dragging by remember { mutableStateOf<Float?>(null) }
+
+    Box(Modifier.fillMaxWidth()) {
+        // Footer, always there underneath the page.
+        Box(
+            Modifier.fillMaxWidth().height(ReaderActivity.FOOTER_HEIGHT_DP.dp).background(theme.bg()),
+            contentAlignment = Alignment.Center,
         ) {
-            LinearProgressIndicator(
-                progress = { progress },
-                color = EasyColors.Accent,
-                trackColor = theme.muted().copy(alpha = 0.25f),
-                drawStopIndicator = {},
-                gapSize = 0.dp,
-                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val text = when {
+                info == null -> "$percent%"
+                vm.isPdf -> "Page ${info.page} of ${info.total} · $percent%"
+                info.leftInChapter == 0 -> "Last page in chapter · $percent%"
+                info.leftInChapter == 1 -> "1 page left in chapter · $percent%"
+                else -> "${info.leftInChapter} pages left in chapter · $percent%"
+            }
+            Text(text, style = MaterialTheme.typography.labelSmall, color = theme.muted())
+        }
+
+        AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(theme.bg().copy(alpha = 0.97f))
+                    .padding(bottom = bottomInset)
+                    .padding(start = 4.dp, end = 20.dp, top = 6.dp, bottom = 6.dp),
+            ) {
                 Text(
                     locator?.title.orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
                     color = theme.muted(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
                 )
-                Text("${(progress * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall, color = theme.muted())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showToc = true }, enabled = vm.toc.isNotEmpty()) {
+                        Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = theme.fg())
+                    }
+                    if (info != null && info.total > 1) {
+                        val shownPage = dragging?.let { it.roundToInt() + 1 } ?: info.page
+                        Slider(
+                            value = dragging ?: (info.page - 1).toFloat(),
+                            onValueChange = { dragging = it },
+                            onValueChangeFinished = {
+                                dragging?.let { v -> vm.pages.getOrNull(v.roundToInt())?.let(onGoToPage) }
+                                dragging = null
+                            },
+                            valueRange = 0f..(info.total - 1).toFloat(),
+                            colors = SliderDefaults.colors(
+                                thumbColor = EasyColors.Accent,
+                                activeTrackColor = EasyColors.Accent,
+                                inactiveTrackColor = theme.muted().copy(alpha = 0.3f),
+                            ),
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        )
+                        Text(
+                            "$shownPage / ${info.total}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = theme.fg(),
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.widthIn(min = 72.dp),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                        Text("$percent%", style = MaterialTheme.typography.bodyMedium, color = theme.fg())
+                    }
+                }
             }
         }
     }
+
+    if (showToc) TocSheet(vm, onGo = { showToc = false; vm.hideBars(); onGo(it) }, onDismiss = { showToc = false })
 }
 
 /** Full-screen "Downloading…" / "Opening…" / problem screen, shown until the book is ready. */
