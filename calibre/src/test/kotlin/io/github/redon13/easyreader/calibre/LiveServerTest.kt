@@ -64,6 +64,16 @@ class LiveServerTest {
             println("Smart shelf: $shelf -> ${client.smartShelfBookIds(lib, shelf)}")
         }
 
+        // Upload the same small EPUB twice to the second library: added, then a duplicate.
+        System.getenv("CALIBRE_TEST_EPUB")?.let { path ->
+            val f = java.io.File(path)
+            val lib2 = libs.libraries.keys.last()
+            val a = client.uploadBook(lib2, "Live upload.epub", f.length(), { f.inputStream() })
+            val b = client.uploadBook(lib2, "Live upload.epub", f.length(), { f.inputStream() })
+            println("Upload: $a then $b")
+            assertTrue(b is UploadResult.Duplicate)
+        }
+
         // Download the first book that has a file.
         books.firstOrNull { it.formats.isNotEmpty() }?.let { b ->
             val dest = java.io.File.createTempFile("live", "." + b.formats.first().lowercase())

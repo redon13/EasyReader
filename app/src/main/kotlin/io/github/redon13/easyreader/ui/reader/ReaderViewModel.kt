@@ -11,15 +11,20 @@ import io.github.redon13.easyreader.EasyReaderApp
 import io.github.redon13.easyreader.calibre.CalibreBookParser
 import io.github.redon13.easyreader.calibre.CalibreException
 import io.github.redon13.easyreader.calibre.ReadingPosition
+import io.github.redon13.easyreader.calibre.UploadResult
 import io.github.redon13.easyreader.calibre.isFinished
+import io.github.redon13.easyreader.data.AppSettings
 import io.github.redon13.easyreader.data.Downloads
+import io.github.redon13.easyreader.data.LastBook
 import io.github.redon13.easyreader.data.ReaderSettings
 import io.github.redon13.easyreader.data.ReaderTheme
 import io.github.redon13.easyreader.data.ReaderTypeface
 import io.github.redon13.easyreader.data.SessionState
 import io.github.redon13.easyreader.data.db.DeviceBookEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -81,6 +86,21 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     val settings: StateFlow<ReaderSettings> = container.settings.readerSettings
         .stateIn(viewModelScope, SharingStarted.Eagerly, ReaderSettings())
+
+    private val appSettings: StateFlow<AppSettings> = container.settings.appSettings
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
+
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 2)
+    /** Short messages for the owner (e.g. "Added to Calibre"). */
+    val messages: SharedFlow<String> = _messages
+
+    private val _addingToCalibre = MutableStateFlow(false)
+    val addingToCalibre: StateFlow<Boolean> = _addingToCalibre.asStateFlow()
+
+    /** True for books opened from the device, which can be added to Calibre. */
+    val canAddToCalibre: Boolean get() = deviceBookHash != null
+
+    private var deviceBookFile: File? = null
 
     private val _barsVisible = MutableStateFlow(true)
     val barsVisible: StateFlow<Boolean> = _barsVisible.asStateFlow()
@@ -151,6 +171,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         libraryId = library
         bookId = id
         title = book.title
+        container.settings.saveLastBook(LastBook(library, id))
         finished = book.isFinished
 
         _state.value = ReaderState.Loading("Downloading…", 0f)
@@ -200,6 +221,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             dest to hash
         }
         deviceBookHash = hash
+        deviceBookFile = file
         val dao = container.database.reading()
         val existing = dao.deviceBook(hash)
         title = existing?.title ?: name.substringBeforeLast('.')
@@ -321,6 +343,35 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { container.settings.saveReaderSettings(change(settings.value)) }
     }
 
+    /** Sends a book opened from the device to Calibre, so it syncs like the others. */
+    fun addToCalibre() {
+        val file = deviceBookFile ?: return
+        if (_addingToCalibre.value) return
+        _addingToCalibre.value = true
+        viewModelScope.launch {
+            try {
+                val session = (container.sessions.state.value as? SessionState.SignedIn)?.session
+                if (session == null) {
+                    _messages.tryEmit("Please sign in to EasyReader first.")
+                    return@launch
+                }
+                val name = title.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifEmpty { "Book" } + "." + format.lowercase()
+                val result = session.client.uploadBook(session.libraryId, name, file.length(), { file.inputStream() })
+                _messages.tryEmit(
+                    when (result) {
+                        is UploadResult.Added -> "Added to Calibre."
+                        is UploadResult.Duplicate -> "Calibre already has this book."
+                    }
+                )
+                if (result is UploadResult.Added) container.library.sync(session)
+            } catch (e: CalibreException) {
+                _messages.tryEmit("Couldn't add it: ${e.message}")
+            } finally {
+                _addingToCalibre.value = false
+            }
+        }
+    }
+
     fun toggleBars() {
         _barsVisible.value = !_barsVisible.value
     }
@@ -337,7 +388,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         // Reaching 95% marks the book finished (once; "Mark as unread" undoes it).
         val lib = libraryId
         val id = bookId
-        if (!finished && lib != null && id != null && (locator.locations.totalProgression ?: 0.0) >= FINISHED_AT) {
+        if (!finished && lib != null && id != null && (locator.locations.totalProgression ?: 0.0) >= appSettings.value.finishedAt) {
             finished = true
             container.appScope.launch { container.changes.setFinished(lib, id, true) }
         }
@@ -389,7 +440,5 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         /** While reading, Calibre is updated at most this often (and always on leaving). */
         private const val SEND_EVERY_MS = 30_000L
 
-        /** How far through a book counts as finished. Will be adjustable in Settings (Stage 5). */
-        private const val FINISHED_AT = 0.95
     }
 }

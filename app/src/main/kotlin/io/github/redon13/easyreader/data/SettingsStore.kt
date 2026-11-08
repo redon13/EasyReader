@@ -44,6 +44,23 @@ data class ReaderSettings(
     val typeface: ReaderTypeface = ReaderTypeface.ALEGREYA,
 )
 
+/** The owner's choices on the Settings screen. */
+data class AppSettings(
+    /** How far through a book counts as finished (0–1). */
+    val finishedAt: Double = 0.95,
+    /** Open the last book read when the app starts. */
+    val resumeLastBook: Boolean = false,
+    /** Show reading progress under covers. */
+    val progressOnCovers: Boolean = true,
+    /** Refresh the library every 10 minutes while the app is open. */
+    val autoSync: Boolean = true,
+    /** Remove downloads of finished books 7 days after they're finished. */
+    val cleanUpFinished: Boolean = true,
+)
+
+/** The last Calibre book opened, for "resume last book on launch". */
+data class LastBook(val libraryId: String, val bookId: Int)
+
 data class SavedLogin(
     val serverUrl: String,
     val username: String,
@@ -145,6 +162,40 @@ class SettingsStore(context: Context) {
         store.edit { it[EMPTY_SHELVES] = change(it[EMPTY_SHELVES].orEmpty()) }
     }
 
+    val appSettings: Flow<AppSettings> = store.data.map { p ->
+        AppSettings(
+            finishedAt = p[FINISHED_AT] ?: 0.95,
+            resumeLastBook = p[RESUME_LAST_BOOK] ?: false,
+            progressOnCovers = p[PROGRESS_ON_COVERS] ?: true,
+            autoSync = p[AUTO_SYNC] ?: true,
+            cleanUpFinished = p[CLEAN_UP_FINISHED] ?: true,
+        )
+    }
+
+    suspend fun saveAppSettings(settings: AppSettings) {
+        store.edit {
+            it[FINISHED_AT] = settings.finishedAt
+            it[RESUME_LAST_BOOK] = settings.resumeLastBook
+            it[PROGRESS_ON_COVERS] = settings.progressOnCovers
+            it[AUTO_SYNC] = settings.autoSync
+            it[CLEAN_UP_FINISHED] = settings.cleanUpFinished
+        }
+    }
+
+    suspend fun lastBook(): LastBook? {
+        val p = store.data.first()
+        val lib = p[LAST_BOOK_LIBRARY] ?: return null
+        val id = p[LAST_BOOK_ID]?.toIntOrNull() ?: return null
+        return LastBook(lib, id)
+    }
+
+    suspend fun saveLastBook(book: LastBook) {
+        store.edit {
+            it[LAST_BOOK_LIBRARY] = book.libraryId
+            it[LAST_BOOK_ID] = book.bookId.toString()
+        }
+    }
+
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val USERNAME = stringPreferencesKey("username")
@@ -156,6 +207,13 @@ class SettingsStore(context: Context) {
         val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
         val LIST_VIEW = booleanPreferencesKey("list_view")
         val EMPTY_SHELVES = stringSetPreferencesKey("empty_shelves")
+        val FINISHED_AT = doublePreferencesKey("finished_at")
+        val RESUME_LAST_BOOK = booleanPreferencesKey("resume_last_book")
+        val PROGRESS_ON_COVERS = booleanPreferencesKey("progress_on_covers")
+        val AUTO_SYNC = booleanPreferencesKey("auto_sync")
+        val CLEAN_UP_FINISHED = booleanPreferencesKey("clean_up_finished")
+        val LAST_BOOK_LIBRARY = stringPreferencesKey("last_book_library")
+        val LAST_BOOK_ID = stringPreferencesKey("last_book_id")
         val READER_THEME = stringPreferencesKey("reader_theme")
         val READER_FONT_SIZE = doublePreferencesKey("reader_font_size")
         val READER_TYPEFACE = stringPreferencesKey("reader_typeface")

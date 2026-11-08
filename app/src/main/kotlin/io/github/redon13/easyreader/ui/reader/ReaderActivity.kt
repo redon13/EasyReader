@@ -113,6 +113,7 @@ class ReaderActivity : AppCompatActivity() {
                 }
                 launch { vm.settings.collect(::applySettings) }
                 launch { vm.barsVisible.collect(::showSystemBars) }
+                launch { vm.messages.collect { Toast.makeText(this@ReaderActivity, it, Toast.LENGTH_LONG).show() } }
             }
         }
     }

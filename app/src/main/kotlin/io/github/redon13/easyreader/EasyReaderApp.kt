@@ -2,6 +2,7 @@ package io.github.redon13.easyreader
 
 import android.app.Application
 import coil.ImageLoader
+import io.github.redon13.easyreader.data.Downloads
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
@@ -15,6 +16,7 @@ class EasyReaderApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        Downloads.scheduleCleanUp(this)
     }
 
     /** Covers are loaded through the signed-in connection and kept on the device for offline use. */

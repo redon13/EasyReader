@@ -21,9 +21,12 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.BufferedSink
 import java.io.File
+import java.io.InputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
@@ -34,7 +37,7 @@ import kotlin.coroutines.coroutineContext
  */
 class CalibreClient(
     val serverUrl: HttpUrl,
-    username: String,
+    val username: String,
     password: String,
     baseClient: OkHttpClient = OkHttpClient(),
 ) {
@@ -200,6 +203,53 @@ class CalibreClient(
         }
         val ids = getJson(b.build()).jsonObject["book_ids"]?.jsonArray ?: throw CalibreException.UnexpectedResponse(null)
         return ids.mapNotNull { (it as? JsonPrimitive)?.intOrNull }
+    }
+
+    /**
+     * Sends a book file to Calibre as a new book. Calibre reads the title and
+     * author from the file. If Calibre already has the same book, nothing is
+     * added and [UploadResult.Duplicate] is returned.
+     *
+     * [open] must give a fresh stream each time it's called (the request may
+     * need to be sent twice while logging in). [onProgress] gets 0–1, or null
+     * while the size is unknown.
+     */
+    suspend fun uploadBook(
+        libraryId: String,
+        fileName: String,
+        size: Long?,
+        open: () -> InputStream,
+        onProgress: (Float?) -> Unit = {},
+    ): UploadResult {
+        val url = url("cdb", "add-book", System.nanoTime().toString(), "n", fileName, libraryId)
+        val body = object : RequestBody() {
+            override fun contentType() = "application/octet-stream".toMediaType()
+            override fun contentLength() = size ?: -1L
+            override fun writeTo(sink: BufferedSink) {
+                open().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    var done = 0L
+                    while (true) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        sink.write(buffer, 0, n)
+                        done += n
+                        onProgress(size?.takeIf { it > 0 }?.let { done.toFloat() / it })
+                    }
+                }
+            }
+        }
+        val request = Request.Builder().url(url).header("Accept", "application/json").post(body).build()
+        val text = execute(request) { it.body?.string() ?: "" }
+        val o = try {
+            json.parseToJsonElement(text).jsonObject
+        } catch (e: Exception) {
+            throw CalibreException.UnexpectedResponse(e)
+        }
+        val title = o["title"].stringOrNull() ?: fileName
+        val authors = (o["authors"] as? JsonArray)?.mapNotNull { it.stringOrNull() }.orEmpty()
+        val id = (o["book_id"] as? JsonPrimitive)?.intOrNull
+        return if (id != null) UploadResult.Added(id, title, authors) else UploadResult.Duplicate(title, authors)
     }
 
     /**

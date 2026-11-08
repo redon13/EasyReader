@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PendingChangeEntity::class,
         SmartShelfEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
                 // downloaded again. Later versions hold reading positions, so
                 // they are upgraded step by step and nothing is lost.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
         /** Stage 4: changes waiting to be sent to Calibre, and smart shelves. */
@@ -45,6 +45,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS `smart_shelves` (`libraryId` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
                         "`name` TEXT NOT NULL, `bookIds` TEXT NOT NULL, PRIMARY KEY(`libraryId`, `kind`, `name`))"
                 )
+            }
+        }
+
+        /** Stage 5: remember when a downloaded book was finished, for the 7-day clean-up. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `downloads` ADD COLUMN `finishedSeenAt` INTEGER")
             }
         }
     }

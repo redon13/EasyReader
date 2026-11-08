@@ -27,6 +27,8 @@ data class DownloadEntity(
     val path: String,
     val sizeBytes: Long,
     val downloadedAt: Long,
+    /** When this device first saw the book as finished (for the 7-day clean-up), or null. */
+    val finishedSeenAt: Long? = null,
 )
 
 /** A book opened from the device's own files (not from Calibre). Its place is kept on this device only. */

@@ -1,6 +1,7 @@
 package io.github.redon13.easyreader.ui.browse
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,12 @@ import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.isFavourite
 import io.github.redon13.easyreader.calibre.isFinished
 import io.github.redon13.easyreader.ui.theme.EasyColors
+
+/** Whether covers show reading progress (the "Progress bar on covers" setting). */
+val LocalShowCoverProgress = compositionLocalOf { true }
+
+/** The book shown in the tablet's details pane, outlined in amber in the grid. */
+val LocalSelectedBookId = compositionLocalOf<Int?> { null }
 
 /** A book cover (2:3) with the title shown underneath while it loads or if there's no cover. */
 @Composable
@@ -97,13 +105,20 @@ fun BookTile(
 ) {
     Column(modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick)) {
         Box {
-            BookCoverImage(book, coverUrl, Modifier.fillMaxWidth())
+            val selected = LocalSelectedBookId.current == book.id
+            BookCoverImage(
+                book,
+                coverUrl,
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (selected) Modifier.border(3.dp, EasyColors.Accent, RoundedCornerShape(10.dp)) else Modifier),
+            )
             if (book.isFinished) FinishedBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
             if (onToggleFavourite != null) {
                 FavouriteButton(book.isFavourite, onToggleFavourite, Modifier.align(Alignment.TopEnd))
             }
         }
-        if (progress != null) {
+        if (progress != null && LocalShowCoverProgress.current) {
             Spacer(Modifier.height(6.dp))
             ReadingProgressBar(progress, Modifier.fillMaxWidth())
         }

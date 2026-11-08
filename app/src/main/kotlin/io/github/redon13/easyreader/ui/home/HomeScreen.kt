@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -108,6 +109,8 @@ fun HomeScreen(
     vm: BrowseViewModel,
     onOpenBook: (Int) -> Unit,
     onSeeAll: (ListKind) -> Unit,
+    onOpenSettings: () -> Unit,
+    onUpload: () -> Unit,
 ) {
     val books by vm.books.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
@@ -150,7 +153,10 @@ fun HomeScreen(
                         }
                     }
                 },
-                navigationIcon = { HomeMenu(vm, libraries) },
+                navigationIcon = { HomeMenu(vm, libraries, onOpenSettings) },
+                actions = {
+                    IconButton(onClick = onUpload) { Icon(Icons.Default.Add, contentDescription = "Upload books") }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = EasyColors.Background,
                     scrolledContainerColor = EasyColors.Background,
@@ -239,12 +245,12 @@ fun HomeScreen(
     if (showColumnHelp && check != null) ColumnHelpDialog(check, onDismiss = { showColumnHelp = false })
 }
 
-private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
+internal fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
     item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-private fun LazyGridScope.resultsSection(
+internal fun LazyGridScope.resultsSection(
     vm: BrowseViewModel,
     filters: Map<FilterCategory, String>,
     smart: SmartShelfFilter?,
@@ -323,7 +329,7 @@ private fun LazyGridScope.resultsSection(
 }
 
 @Composable
-private fun Controls(
+internal fun Controls(
     vm: BrowseViewModel,
     filterCount: Int,
     listView: Boolean,
@@ -467,12 +473,13 @@ private fun ContinueCard(book: CalibreBook, position: ReadingPosition, vm: Brows
 }
 
 @Composable
-private fun HomeMenu(vm: BrowseViewModel, libraries: Map<String, String>) {
+internal fun HomeMenu(vm: BrowseViewModel, libraries: Map<String, String>, onOpenSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) { Icon(Icons.Default.Menu, contentDescription = "Menu") }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text("Sync now") }, onClick = { open = false; vm.sync() })
+            DropdownMenuItem(text = { Text("Settings") }, onClick = { open = false; onOpenSettings() })
             if (libraries.size > 1) {
                 HorizontalDivider(color = EasyColors.Divider)
                 Text(
@@ -546,7 +553,7 @@ private fun EmptyLibrary(syncing: Boolean, columns: ColumnCheck?, onColumnHelp: 
 
 /** Tells the owner which of EasyReader's custom columns Calibre is missing. */
 @Composable
-private fun ColumnBanner(check: ColumnCheck, onHelp: () -> Unit) {
+internal fun ColumnBanner(check: ColumnCheck, onHelp: () -> Unit) {
     val names = (check.missing + check.wrongType).joinToString(", ") { it.lookupName }
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -572,7 +579,7 @@ private fun ColumnBanner(check: ColumnCheck, onHelp: () -> Unit) {
 }
 
 @Composable
-private fun ColumnHelpDialog(check: ColumnCheck, onDismiss: () -> Unit) {
+internal fun ColumnHelpDialog(check: ColumnCheck, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = EasyColors.Surface,
