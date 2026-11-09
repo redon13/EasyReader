@@ -48,7 +48,9 @@ import io.github.redon13.easyreader.ui.browse.BookTile
 import io.github.redon13.easyreader.ui.browse.BrowseViewModel
 import io.github.redon13.easyreader.ui.browse.FiltersSheet
 import io.github.redon13.easyreader.ui.browse.ListKind
+import io.github.redon13.easyreader.ui.browse.ShelfCard
 import io.github.redon13.easyreader.ui.browse.SortSheet
+import io.github.redon13.easyreader.data.browse.FilterCategory
 import io.github.redon13.easyreader.ui.theme.EasyColors
 
 /**
@@ -79,6 +81,9 @@ fun TabletLibrary(
     val all by vm.allBooks.collectAsStateWithLifecycle()
 
     var kind by rememberSaveable { mutableStateOf(ListKind.ALL) }
+    // The "Shelves" choice shows shelf cards instead of books.
+    var shelvesChosen by rememberSaveable { mutableStateOf(false) }
+    val shelves by vm.shelves.collectAsStateWithLifecycle()
     var showFilters by remember { mutableStateOf(false) }
     var showSort by remember { mutableStateOf(false) }
     var showColumnHelp by remember { mutableStateOf(false) }
@@ -138,11 +143,19 @@ fun TabletLibrary(
                     } else {
                         fullWidth("kinds") {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(listOf(ListKind.ALL, ListKind.READING, ListKind.RECENT, ListKind.FAVOURITES, ListKind.UNREAD)) { k ->
+                                // null stands for the "Shelves" choice.
+                                items(listOf(ListKind.ALL, ListKind.READING, ListKind.RECENT, null, ListKind.FAVOURITES, ListKind.UNREAD)) { k ->
                                     FilterChip(
-                                        selected = kind == k,
-                                        onClick = { kind = k },
-                                        label = { Text(k.title) },
+                                        selected = if (k == null) shelvesChosen else !shelvesChosen && kind == k,
+                                        onClick = {
+                                            if (k == null) {
+                                                shelvesChosen = true
+                                            } else {
+                                                shelvesChosen = false
+                                                kind = k
+                                            }
+                                        },
+                                        label = { Text(k?.title ?: "Shelves") },
                                         colors = FilterChipDefaults.filterChipColors(
                                             containerColor = EasyColors.SurfaceHigh,
                                             labelColor = EasyColors.Text,
@@ -154,7 +167,29 @@ fun TabletLibrary(
                                 }
                             }
                         }
-                        if (shown.isEmpty()) {
+                        if (shelvesChosen) {
+                            if (shelves.isEmpty()) {
+                                fullWidth("noshelves") {
+                                    Text(
+                                        "No shelves yet. Use Add to shelf on a book's page, or Filters & shelves → My shelves.",
+                                        color = EasyColors.TextMuted,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(top = 48.dp),
+                                    )
+                                }
+                            }
+                            items(shelves, key = { "shelf:" + it.value }) { shelf ->
+                                ShelfCard(
+                                    name = shelf.value,
+                                    count = shelf.count,
+                                    covers = shelfCovers(vm, recent, shelf.value),
+                                    onClick = {
+                                        vm.clearSmartShelf()
+                                        vm.setFilter(FilterCategory.SHELVES, shelf.value)
+                                    },
+                                )
+                            }
+                        } else if (shown.isEmpty()) {
                             fullWidth("empty") {
                                 Text(
                                     "Nothing here yet.",
@@ -164,7 +199,7 @@ fun TabletLibrary(
                                 )
                             }
                         }
-                        items(shown, key = { it.id }) { book ->
+                        if (!shelvesChosen) items(shown, key = { it.id }) { book ->
                             val progress = positions[book.id]?.progress?.toFloat()
                             if (listView) BookListRow(book, vm.coverUrl(book), onClick = { onSelect(book.id) }, progress = progress)
                             else BookTile(

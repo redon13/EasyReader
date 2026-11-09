@@ -87,6 +87,7 @@ import io.github.redon13.easyreader.calibre.CalibreBook
 import io.github.redon13.easyreader.calibre.ColumnCheck
 import io.github.redon13.easyreader.calibre.ReadingPosition
 import io.github.redon13.easyreader.calibre.isFinished
+import io.github.redon13.easyreader.calibre.shelves
 import io.github.redon13.easyreader.calibre.RequiredColumn
 import io.github.redon13.easyreader.data.browse.Browse
 import io.github.redon13.easyreader.data.browse.FilterCategory
@@ -99,6 +100,7 @@ import io.github.redon13.easyreader.ui.browse.FiltersSheet
 import io.github.redon13.easyreader.ui.browse.GridViewIcon
 import io.github.redon13.easyreader.ui.browse.ListKind
 import io.github.redon13.easyreader.ui.browse.ReadingProgressBar
+import io.github.redon13.easyreader.ui.browse.ShelfCard
 import io.github.redon13.easyreader.ui.browse.SortSheet
 import io.github.redon13.easyreader.ui.reader.ReaderActivity
 import io.github.redon13.easyreader.ui.theme.EasyColors
@@ -123,6 +125,7 @@ fun HomeScreen(
     val reading by vm.continueReading.collectAsStateWithLifecycle()
     val favourites by vm.favourites.collectAsStateWithLifecycle()
     val unread by vm.unread.collectAsStateWithLifecycle()
+    val shelves by vm.shelves.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val openReader: (Int) -> Unit = { id -> ReaderActivity.open(context, vm.session.libraryId, id) }
     val syncing by vm.syncing.collectAsStateWithLifecycle()
@@ -134,6 +137,7 @@ fun HomeScreen(
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
     var showFilters by remember { mutableStateOf(false) }
+    var filtersTab by remember { mutableStateOf(0) }
     var showSort by remember { mutableStateOf(false) }
     var showColumnHelp by remember { mutableStateOf(false) }
 
@@ -199,7 +203,7 @@ fun HomeScreen(
                             vm = vm,
                             filterCount = query.filters.size + (if (query.smartShelf != null) 1 else 0),
                             listView = listView,
-                            onFilters = { showFilters = true },
+                            onFilters = { filtersTab = 0; showFilters = true },
                             onSort = { showSort = true },
                         )
                     }
@@ -218,6 +222,19 @@ fun HomeScreen(
                         }
                         fullWidth("recent") {
                             CoverRow("Recently added", null, recent, vm, positions, onOpenBook) { onSeeAll(ListKind.RECENT) }
+                        }
+                        if (shelves.isNotEmpty()) {
+                            fullWidth("shelves") {
+                                ShelvesRow(
+                                    vm,
+                                    recent,
+                                    onOpen = { name ->
+                                        vm.clearSmartShelf()
+                                        vm.setFilter(FilterCategory.SHELVES, name)
+                                    },
+                                    onSeeAll = { filtersTab = 1; showFilters = true },
+                                )
+                            }
                         }
                         if (favourites.isNotEmpty()) {
                             fullWidth("favourites") {
@@ -239,7 +256,7 @@ fun HomeScreen(
         }
     }
 
-    if (showFilters) FiltersSheet(vm, onDismiss = { showFilters = false })
+    if (showFilters) FiltersSheet(vm, onDismiss = { showFilters = false }, initialTab = filtersTab)
     if (showSort) SortSheet(vm, onDismiss = { showSort = false })
     val check = columns
     if (showColumnHelp && check != null) ColumnHelpDialog(check, onDismiss = { showColumnHelp = false })
@@ -405,6 +422,7 @@ private fun CoverRow(
     onOpenBook: (Int) -> Unit,
     onSeeAll: (() -> Unit)?,
 ) {
+    val listView by vm.listView.collectAsStateWithLifecycle()
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -420,7 +438,19 @@ private fun CoverRow(
             }
         }
         Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (listView) {
+            // List view: the first few books as a list; "See all" shows the rest.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                books.take(LIST_LENGTH).forEach { book ->
+                    BookListRow(
+                        book,
+                        vm.coverUrl(book),
+                        onClick = { onOpenBook(book.id) },
+                        progress = positions[book.id]?.progress?.toFloat(),
+                    )
+                }
+            }
+        } else LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(books.take(ROW_LENGTH), key = { it.id }) { book ->
                 BookTile(
                     book,
@@ -436,6 +466,36 @@ private fun CoverRow(
 }
 
 private const val ROW_LENGTH = 20
+private const val LIST_LENGTH = 5
+
+/** The "Shelves" row: a card for each of the owner's shelves. */
+@Composable
+private fun ShelvesRow(vm: BrowseViewModel, recent: List<CalibreBook>, onOpen: (String) -> Unit, onSeeAll: () -> Unit) {
+    val shelves by vm.shelves.collectAsStateWithLifecycle()
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Shelves", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            TextButton(onClick = onSeeAll) {
+                Text("See all", color = EasyColors.Accent, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(shelves, key = { it.value }) { shelf ->
+                ShelfCard(
+                    name = shelf.value,
+                    count = shelf.count,
+                    covers = shelfCovers(vm, recent, shelf.value),
+                    onClick = { onOpen(shelf.value) },
+                )
+            }
+        }
+    }
+}
+
+/** The first few books on a shelf (most recently added first), with their cover addresses. */
+internal fun shelfCovers(vm: BrowseViewModel, recent: List<CalibreBook>, shelf: String): List<Pair<CalibreBook, String>> =
+    recent.asSequence().filter { b -> b.shelves.any { it == shelf } }.take(3).map { it to vm.coverUrl(it) }.toList()
 
 /** The "Continue reading" card: the book read most recently, one tap to carry on. */
 @Composable
