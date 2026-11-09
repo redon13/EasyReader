@@ -118,7 +118,8 @@ fun BookTile(
                 FavouriteButton(book.isFavourite, onToggleFavourite, Modifier.align(Alignment.TopEnd))
             }
         }
-        if (progress != null && LocalShowCoverProgress.current) {
+        // Finished books (green tick) don't show a progress bar.
+        if (progress != null && LocalShowCoverProgress.current && !book.isFinished) {
             Spacer(Modifier.height(6.dp))
             ReadingProgressBar(progress, Modifier.fillMaxWidth())
         }

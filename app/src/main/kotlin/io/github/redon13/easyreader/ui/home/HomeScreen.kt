@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -383,13 +384,28 @@ internal fun Controls(
                 onClick = onFilters,
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, if (filterCount > 0) EasyColors.Accent else EasyColors.Outline),
+                contentPadding = PaddingValues(horizontal = 12.dp),
                 modifier = Modifier.weight(1f).height(48.dp),
             ) {
                 Text(
-                    if (filterCount > 0) "Filters & shelves ($filterCount)" else "Filters & shelves",
+                    "Filters & shelves",
                     color = EasyColors.Text,
                     style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                // How many filters are on, as a small amber badge (always fits on one line).
+                if (filterCount > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier.size(22.dp).background(EasyColors.Accent, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(filterCount.toString(), color = EasyColors.OnAccent, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
             OutlinedButton(
                 onClick = onSort,
