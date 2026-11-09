@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
@@ -30,7 +31,8 @@ import kotlin.math.hypot
  * How it works: just before a turn, a picture of the current page is taken.
  * The reader then moves to the next (or previous) page underneath, and this
  * view draws the picture folding over along a line that follows the finger,
- * with a paper-coloured flap and soft shadows. When the turn finishes the
+ * with a paper-coloured flap (showing the page's text faintly, mirrored, as
+ * if through thin paper) and soft shadows. When the turn finishes the
  * picture is dropped and the real page is shown again.
  *
  * Geometry: the page corner C (bottom-right, or top-right if the touch began
@@ -72,6 +74,8 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
     private val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
+    private val mirror = Matrix()
+    private val showThroughPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = 46 }
 
     init {
         setWillNotDraw(false)
@@ -326,6 +330,20 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         if (flap.size >= 3) {
             val flapPath = toPath(flap)
             canvas.drawPath(flapPath, flapPaint)
+            // Show-through: the page's own text, mirrored and faint, as if seen through thin paper.
+            // The mirror is a reflection across the fold line (normal d, through M).
+            val k = 2 * (mx * dx + my * dy)
+            mirror.setValues(
+                floatArrayOf(
+                    1 - 2 * dx * dx, -2 * dx * dy, k * dx,
+                    -2 * dx * dy, 1 - 2 * dy * dy, k * dy,
+                    0f, 0f, 1f,
+                ),
+            )
+            canvas.save()
+            canvas.clipPath(flapPath)
+            canvas.drawBitmap(bmp, mirror, showThroughPaint)
+            canvas.restore()
             shadowPaint.shader = LinearGradient(
                 mx, my, mx + dx * shadowWidth * 1.4f, my + dy * shadowWidth * 1.4f,
                 Color.argb(70, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP,
