@@ -51,10 +51,10 @@ import io.github.redon13.easyreader.ui.theme.EasyColors
 /** The "Filters & shelves" panel that slides up from the bottom. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit) {
+fun FiltersSheet(vm: BrowseViewModel, onDismiss: () -> Unit, initialTab: Int = 0) {
     val query by vm.query.collectAsStateWithLifecycle()
     var category by remember { mutableStateOf<FilterCategory?>(null) }
-    var tab by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(initialTab) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

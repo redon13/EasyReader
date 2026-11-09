@@ -63,13 +63,16 @@ private fun LibraryNavigation(container: AppContainer, session: Session) {
     val vm = viewModel(key = "browse-${session.libraryId}-${System.identityHashCode(session.client)}") {
         BrowseViewModel(container, session)
     }
-    // While the app is on screen, refresh the library every 10 minutes (if turned on in Settings).
+    // Each time the app comes back on screen (from another app, or the screen turning on),
+    // refresh straight away if the last sync was over a minute ago, so places read on the
+    // other device show up. Then, while it stays on screen, every 10 minutes.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(vm) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            vm.syncIfDue(SYNC_ON_RETURN_MS)
             while (true) {
-                vm.syncIfDue(SYNC_EVERY_MS)
                 delay(60_000)
+                vm.syncIfDue(SYNC_EVERY_MS)
             }
         }
     }
@@ -158,3 +161,4 @@ private fun LibraryNavigation(container: AppContainer, session: Session) {
 }
 
 private const val SYNC_EVERY_MS = 10 * 60 * 1000L
+private const val SYNC_ON_RETURN_MS = 60 * 1000L

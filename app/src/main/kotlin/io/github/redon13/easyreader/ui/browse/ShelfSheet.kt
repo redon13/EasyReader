@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +48,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,6 +67,79 @@ fun shelfColour(name: String): Color {
         0xFFC9A2E8, 0xFFE8D27F, 0xFF7FD6D0, 0xFFE8B48F,
     )
     return Color(palette[Math.floorMod(name.lowercase().hashCode(), palette.size)])
+}
+
+/**
+ * A shelf on the home screen: its colour, the first few covers fanned out,
+ * its name and how many books are on it.
+ */
+@Composable
+fun ShelfCard(
+    name: String,
+    count: Int,
+    covers: List<Pair<CalibreBook, String>>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .width(150.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(EasyColors.Surface)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .background(shelfColour(name).copy(alpha = 0.25f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (covers.isEmpty()) {
+                Text("Empty", style = MaterialTheme.typography.bodySmall, color = EasyColors.TextMuted)
+            }
+            // Up to three covers, fanned out with the first on top.
+            val shown = covers.take(3)
+            shown.reversed().forEachIndexed { i, (book, url) ->
+                val pos = shown.size - 1 - i
+                val angle = when (shown.size) {
+                    1 -> 0f
+                    2 -> if (pos == 0) -6f else 8f
+                    else -> listOf(0f, -10f, 10f)[pos]
+                }
+                val shift = when (shown.size) {
+                    1 -> 0
+                    2 -> if (pos == 0) -12 else 14
+                    else -> listOf(0, -28, 28)[pos]
+                }
+                BookCoverImage(
+                    book,
+                    url,
+                    Modifier
+                        .width(64.dp)
+                        .offset(x = shift.dp)
+                        .rotate(angle)
+                        .shadow(4.dp, RoundedCornerShape(10.dp)),
+                    small = true,
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(10.dp).background(shelfColour(name), CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (count == 1) "1 book" else "$count books",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EasyColors.TextMuted,
+                )
+            }
+        }
+    }
 }
 
 /** "Add to shelf" for one book: tick the shelves it should be on, or make a new one. */
