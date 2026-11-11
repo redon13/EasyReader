@@ -4,6 +4,21 @@ EasyReader is a private Android app for reading and managing my ebook library, w
 
 It shows everything Calibre knows about each book, lets me read EPUB and PDF books (online or offline), upload new books from my phone or tablet, and keeps my place in every book in sync between devices.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/1-home.jpg" width="240" alt="Home screen"><br>Home</td>
+    <td align="center"><img src="docs/screenshots/2-list-view.jpg" width="240" alt="Home screen in list view"><br>List view</td>
+    <td align="center"><img src="docs/screenshots/3-book-details.jpg" width="240" alt="Book details"><br>Book details</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/4-filters-and-shelves.jpg" width="240" alt="Filters and shelves panel"><br>Filters &amp; shelves</td>
+    <td align="center"><img src="docs/screenshots/5-sort.jpg" width="240" alt="Sort panel"><br>Sort</td>
+    <td align="center" valign="top"><img src="docs/screenshots/6-settings-reading.jpg" width="240" alt="Reading settings"><br>Reading settings</td>
+  </tr>
+</table>
+
 ## What it does
 
 - Browse the whole Calibre library: covers, authors, series, tags, languages, publishers, ratings, formats and custom columns
