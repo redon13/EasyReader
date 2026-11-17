@@ -23,6 +23,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import org.readium.r2.navigator.OverflowableNavigator
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.hypot
 
 /**
@@ -44,6 +45,10 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
 
     /** Whether page curl is turned on (the Slide / Curl choice in Aa). */
     var curlEnabled = false
+        set(value) {
+            field = value
+            pageChanged()
+        }
 
     /** The reader's page view; set once the book is open. */
     var navigator: OverflowableNavigator? = null
@@ -72,14 +77,37 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
 
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val flapPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val path = Path()
     private val mirror = Matrix()
     private val showThroughPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = 46 }
 
     init {
         setWillNotDraw(false)
         paperColor = Color.WHITE
+    }
+
+    /** True when [picture] shows the page exactly as it is on screen now. */
+    private var pictureFresh = false
+    private val refreshRunnable = Runnable { refreshPicture() }
+
+    /**
+     * Call whenever what's on screen changes (new page, bars shown or hidden,
+     * reading settings). A fresh picture is taken once the page has settled,
+     * so the next turn can start instantly instead of waiting for one.
+     */
+    fun pageChanged() {
+        pictureFresh = false
+        removeCallbacks(refreshRunnable)
+        if (curlEnabled) postDelayed(refreshRunnable, SETTLE_MS)
+    }
+
+    private fun refreshPicture() {
+        if (state != State.IDLE || !curlEnabled) return
+        takePicture { bmp ->
+            if (bmp != null && state == State.IDLE) {
+                picture = bmp
+                pictureFresh = true
+            }
+        }
     }
 
     /** True while a turn is under way (taps on the page are ignored then). */
@@ -92,7 +120,7 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         downY = y
         downX = if (forward) width.toFloat() else 0f
         beginTurn(forward, downX, y) {
-            animateTo(complete = true)
+            animateTo(complete = true, velocity = 0f)
         }
     }
 
@@ -148,17 +176,19 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
                     forward -> (fast && vx < 0) || (!fast && foldX < width / 2f)
                     else -> (fast && vx > 0) || (!fast && foldX > width / 2f)
                 }
+                releaseVelocity = vx
                 if (state == State.PREPARING) {
                     // The picture isn't ready yet: finish as soon as it is.
                     pendingRelease = complete
                 } else {
-                    animateTo(complete)
+                    animateTo(complete, vx)
                 }
             }
         }
     }
 
     private var pendingRelease: Boolean? = null
+    private var releaseVelocity = 0f
 
     /** Fold position for a finger at [x]: starts at the right edge (forward) or left edge (back). */
     private fun foldFor(x: Float) = (if (forward) width.toFloat() else 0f) + (x - downX)
@@ -172,15 +202,12 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         foldX = foldFor(x)
         fingerY = y
         pendingRelease = null
-        takePicture { bmp ->
-            val nav = navigator
-            if (bmp == null || nav == null) {
-                // No picture: fall back to an ordinary page turn.
-                state = State.IDLE
-                if (forward) nav?.goForward(animated = true) else nav?.goBackward(animated = true)
-                return@takePicture
-            }
+        removeCallbacks(refreshRunnable)
+
+        fun start(bmp: Bitmap) {
+            val nav = navigator ?: return finish()
             picture = bmp
+            pictureFresh = false
             state = State.DRAGGING
             invalidate()
             // Move the real page underneath once the picture is on screen.
@@ -193,12 +220,28 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
                     return@postOnAnimation
                 }
                 then?.invoke()
-                pendingRelease?.let { animateTo(it) }
+                pendingRelease?.let { animateTo(it, releaseVelocity) }
             }
+        }
+
+        val ready = picture?.takeIf { pictureFresh && it.width == width && it.height == height && !it.isRecycled }
+        if (ready != null) {
+            // Taken in advance: the curl starts straight away.
+            start(ready)
+            return
+        }
+        takePicture { bmp ->
+            if (bmp == null || navigator == null) {
+                // No picture: fall back to an ordinary page turn.
+                state = State.IDLE
+                if (forward) navigator?.goForward(animated = true) else navigator?.goBackward(animated = true)
+                return@takePicture
+            }
+            start(bmp)
         }
     }
 
-    private fun animateTo(complete: Boolean) {
+    private fun animateTo(complete: Boolean, velocity: Float) {
         if (picture == null) return
         state = State.ANIMATING
         val startX = foldX
@@ -208,8 +251,11 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         val endY = downY
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = (220 + 260 * abs(endX - startX) / width.coerceAtLeast(1)).toLong()
-            interpolator = DecelerateInterpolator(1.6f)
+            // Carry on at about the speed of the flick (or a calm pace after a tap or slow drag),
+            // easing out gently at the end.
+            val speed = abs(velocity).coerceAtLeast(MIN_FINISH_SPEED)
+            duration = (abs(endX - startX) / speed * 1000 * 1.6f).toLong().coerceIn(180L, 420L)
+            interpolator = DecelerateInterpolator(1.3f)
             addUpdateListener {
                 val t = it.animatedValue as Float
                 foldX = startX + (endX - startX) * t
@@ -239,6 +285,7 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         state = State.IDLE
         pendingRelease = null
         invalidate()
+        pageChanged()
     }
 
     private fun takePicture(done: (Bitmap?) -> Unit) {
@@ -262,16 +309,44 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
 
     // ---- Drawing -------------------------------------------------------------------
 
+    // Reused on every frame, so drawing doesn't create new objects 60 times a second.
+    private val flatPath = Path()
+    private val liftedPath = Path()
+    private val flapPath = Path()
+    private val shaderMatrix = Matrix()
+
+    /** Soft shadow fading away from the fold (drawn along a unit line, then placed with a matrix). */
+    private val foldShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(0f, 0f, 1f, 0f, Color.argb(95, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+    }
+
+    /** Light and shade across the flap, like a gently rolled sheet of paper. */
+    private val flapShade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f, 0f, 1f, 0f,
+            intArrayOf(
+                Color.argb(70, 0, 0, 0),
+                Color.argb(45, 255, 255, 255),
+                Color.argb(22, 0, 0, 0),
+                Color.argb(0, 0, 0, 0),
+            ),
+            floatArrayOf(0f, 0.2f, 0.6f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        color = Color.argb(30, 0, 0, 0)
+    }
+
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
         val bmp = picture ?: return
         when (state) {
-            State.IDLE -> return
-            State.PREPARING -> return
-            State.SETTLING -> {
-                canvas.drawBitmap(bmp, 0f, 0f, bitmapPaint)
-                return
-            }
+            State.IDLE, State.PREPARING -> return
+            State.SETTLING -> canvas.drawBitmap(bmp, 0f, 0f, bitmapPaint)
             else -> drawCurl(canvas, bmp)
         }
     }
@@ -305,30 +380,31 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
             val d = side(p)
             PointF(p.x - 2 * d * dx, p.y - 2 * d * dy)
         }
+        toPath(flat, flatPath)
+        toPath(lifted, liftedPath)
+        toPath(flap, flapPath)
 
         // Forward: the old page (picture) is the part still flat; the new page shows where it lifted.
         // Backward: the new (previous) page lies flat; the old page (picture) shows where it lifted.
         canvas.save()
-        canvas.clipPath(toPath(if (forward) flat else lifted))
+        canvas.clipPath(if (forward) flatPath else liftedPath)
         canvas.drawBitmap(bmp, 0f, 0f, bitmapPaint)
         canvas.restore()
 
+        val depth = dist / 2                                   // how far the flap reaches from the fold
+        val soft = (dist * 0.25f).coerceIn(8f, w * 0.12f)      // width of the soft shadows
+
         // Shadow cast by the flap onto the page beneath, along the fold.
-        val shadowWidth = (dist * 0.25f).coerceIn(8f, w * 0.12f)
         if (lifted.size >= 3) {
-            shadowPaint.shader = LinearGradient(
-                mx, my, mx - dx * shadowWidth, my - dy * shadowWidth,
-                Color.argb(90, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP,
-            )
+            placeShader(foldShadow, mx, my, -dx, -dy, soft)
             canvas.save()
-            canvas.clipPath(toPath(lifted))
-            canvas.drawPaint(shadowPaint)
+            canvas.clipPath(liftedPath)
+            canvas.drawPaint(foldShadow)
             canvas.restore()
         }
 
-        // The flap: the back of the turning page, paper-coloured, darker towards the fold.
+        // The flap: the back of the turning page.
         if (flap.size >= 3) {
-            val flapPath = toPath(flap)
             canvas.drawPath(flapPath, flapPaint)
             // Show-through: the page's own text, mirrored and faint, as if seen through thin paper.
             // The mirror is a reflection across the fold line (normal d, through M).
@@ -343,28 +419,26 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
             canvas.save()
             canvas.clipPath(flapPath)
             canvas.drawBitmap(bmp, mirror, showThroughPaint)
+            // Light and shade across the flap so it looks rolled, not folded flat.
+            placeShader(flapShade, mx, my, dx, dy, depth.coerceAtLeast(soft * 2))
+            canvas.drawPaint(flapShade)
             canvas.restore()
-            shadowPaint.shader = LinearGradient(
-                mx, my, mx + dx * shadowWidth * 1.4f, my + dy * shadowWidth * 1.4f,
-                Color.argb(70, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP,
-            )
-            canvas.save()
-            canvas.clipPath(flapPath)
-            canvas.drawPaint(shadowPaint)
-            canvas.restore()
-            // A soft shadow just beyond the flap's edge.
-            shadowPaint.shader = null
-            shadowPaint.color = Color.argb(28, 0, 0, 0)
-            shadowPaint.style = Paint.Style.STROKE
-            shadowPaint.strokeWidth = 6f
-            canvas.drawPath(flapPath, shadowPaint)
-            shadowPaint.style = Paint.Style.FILL
+            canvas.drawPath(flapPath, edgePaint)
         }
+    }
+
+    /** Points a unit-length gradient from (x, y) in direction (ux, uy), stretched to [length]. */
+    private fun placeShader(paint: Paint, x: Float, y: Float, ux: Float, uy: Float, length: Float) {
+        shaderMatrix.reset()
+        shaderMatrix.setScale(length, length)
+        shaderMatrix.postRotate(Math.toDegrees(atan2(uy, ux).toDouble()).toFloat())
+        shaderMatrix.postTranslate(x, y)
+        paint.shader.setLocalMatrix(shaderMatrix)
     }
 
     /** Cuts a polygon by the fold line, keeping one side (Sutherland–Hodgman, one edge). */
     private fun clip(poly: List<PointF>, keepPositive: Boolean, side: (PointF) -> Float): List<PointF> {
-        val out = ArrayList<PointF>()
+        val out = ArrayList<PointF>(6)
         fun inside(p: PointF) = if (keepPositive) side(p) >= 0 else side(p) < 0
         for (i in poly.indices) {
             val a = poly[i]
@@ -382,13 +456,12 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         return out
     }
 
-    private fun toPath(poly: List<PointF>): Path {
-        path.reset()
-        if (poly.isEmpty()) return path
-        path.moveTo(poly[0].x, poly[0].y)
-        for (i in 1 until poly.size) path.lineTo(poly[i].x, poly[i].y)
-        path.close()
-        return Path(path)
+    private fun toPath(poly: List<PointF>, target: Path) {
+        target.reset()
+        if (poly.isEmpty()) return
+        target.moveTo(poly[0].x, poly[0].y)
+        for (i in 1 until poly.size) target.lineTo(poly[i].x, poly[i].y)
+        target.close()
     }
 
     private fun isDark(color: Int) =
@@ -399,4 +472,12 @@ class PageCurlLayout(context: Context, private val window: Window) : FrameLayout
         (Color.green(a) + (Color.green(b) - Color.green(a)) * t).toInt(),
         (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t).toInt(),
     )
+
+    private companion object {
+        /** Wait this long after the page changes before taking the next picture. */
+        const val SETTLE_MS = 350L
+
+        /** Slowest speed (pixels per second) for finishing a turn after letting go. */
+        const val MIN_FINISH_SPEED = 2200f
+    }
 }

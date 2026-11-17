@@ -345,6 +345,22 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    private val _previewBrightness = MutableStateFlow<Float?>(null)
+    /** Brightness while the slider is being dragged (shown straight away, saved on letting go). */
+    val previewBrightness: StateFlow<Float?> = _previewBrightness.asStateFlow()
+
+    fun previewBrightness(value: Float) {
+        _previewBrightness.value = value
+    }
+
+    fun saveBrightness(value: Float) {
+        viewModelScope.launch {
+            container.settings.saveReaderSettings(settings.value.copy(brightness = value, useSystemBrightness = false))
+            settings.first { it.brightness == value }
+            _previewBrightness.value = null
+        }
+    }
+
     fun updateSettings(change: (ReaderSettings) -> ReaderSettings) {
         viewModelScope.launch { container.settings.saveReaderSettings(change(settings.value)) }
     }

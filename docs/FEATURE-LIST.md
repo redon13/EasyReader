@@ -14,24 +14,12 @@ When a device is offline, the reading place is saved on the device and sent to C
 - A small **"Offline"** label in the reader's footer while the latest place hasn't been sent.
 - *To decide:* also warn when **opening** a book while offline ("may not be your latest place")? Suggested: yes.
 
-### 2. Keep the screen on while reading
-
-- The screen doesn't dim or turn off while EasyReader is on screen, so reading isn't interrupted. Normal screen timeout applies after leaving the app.
-- *To decide:* only in the **reader**, or anywhere in the app? Suggested: only in the reader.
-
-### 3. Screen brightness in the reader's Aa panel
-
-- A **brightness slider** in Aa, alongside text size, typeface, page turn and background.
-- Changes the brightness **only while reading**. Leaving the reader returns to the phone's normal brightness.
-- A **"Use phone brightness"** switch (on by default) follows the phone's own setting, including auto-brightness.
-- The chosen brightness is remembered.
-- *To decide:* one brightness for all backgrounds, or one per background (dark is often read dimmer)? Suggested: one.
-
-### 4. Smoother page curl
-
-- Make the page-curl animation feel smoother and more natural.
-- *To decide:* what feels rough at the moment? For example a pause at the start of a turn, jerky movement while dragging, the speed of the finish, or the fold looking flat rather than gently rounded. A short description or screen recording will help.
-
 ## Done
 
-Nothing yet since version 1.0. For everything in 1.0, see the [spec](SPEC.md).
+### Version 1.1.0
+
+- **Keep the screen on while reading** – the screen stays on while the reader is open; the library and other screens use the phone's normal timeout.
+- **Screen brightness in the reader's Aa panel** – a brightness slider with a "Use phone brightness" switch (on by default). It applies only while reading, and one brightness is used for all backgrounds.
+- **Smoother page curl** – the picture of the page is taken in advance so a turn starts instantly; drawing reuses its working memory to avoid stutters; shading across the fold makes the page look gently rolled; and the turn finishes at about the speed of the flick, easing out gently.
+
+For everything in 1.0, see the [spec](SPEC.md).
