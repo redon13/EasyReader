@@ -57,6 +57,7 @@ class ReaderActivity : AppCompatActivity() {
     private var navigator: VisualNavigator? = null
     private lateinit var root: FrameLayout
     private lateinit var curl: PageCurlLayout
+    private var lastCurlSettings: ReaderSettings? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // After a rotation the book is still open: Android can rebuild the page
@@ -78,7 +79,7 @@ class ReaderActivity : AppCompatActivity() {
 
         root = FrameLayout(this)
         // The pages sit inside the page-curl layer, which can turn them like paper.
-        curl = PageCurlLayout(this, window)
+        curl = PageCurlLayout(this)
         curl.addView(FragmentContainerView(this).apply { id = R.id.reader_pages }, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         val pages = curl
         val topBar = ComposeView(this).apply {
@@ -176,7 +177,8 @@ class ReaderActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 nav.currentLocator.collect {
                     vm.onLocatorChanged(it)
-                    curl.pageChanged()
+                    // Tells the page curl which page is showing (it keeps pictures of recent pages).
+                    curl.onPageShown("${it.href}#${it.locations.position}#${it.locations.progression}")
                 }
             }
         }
@@ -195,6 +197,11 @@ class ReaderActivity : AppCompatActivity() {
         }
         (navigator as? EpubNavigatorFragment)?.submitPreferences(vm.epubPreferences(settings))
         curl.curlEnabled = settings.pageTurn == PageTurn.CURL
+        // Text size, typeface or background may have changed: old page pictures no longer match.
+        if (settings != lastCurlSettings) {
+            lastCurlSettings = settings
+            curl.clearPictures()
+        }
         if (vm.previewBrightness.value == null) {
             applyBrightness(settings.brightness.takeUnless { settings.useSystemBrightness })
         }
@@ -212,7 +219,6 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun showSystemBars(show: Boolean) {
-        if (::curl.isInitialized) curl.pageChanged()
         val controller = WindowCompat.getInsetsController(window, root)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (show || navigator == null) controller.show(WindowInsetsCompat.Type.systemBars())
