@@ -16,6 +16,10 @@ When a device is offline, the reading place is saved on the device and sent to C
 
 ## Done
 
+### Version 1.1.1
+
+- **Page curl rebuilt** – during a turn the app draws both pages itself from pictures, so the real page can't flash through; recent pages are remembered, so turning straight back is instant; sideways swipes go to the curl from the first touch; fixed the old page flashing at the end of a turn back; lighter back of the page in dark mode and a crisper finish.
+
 ### Version 1.1.0
 
 - **Keep the screen on while reading** – the screen stays on while the reader is open; the library and other screens use the phone's normal timeout.
