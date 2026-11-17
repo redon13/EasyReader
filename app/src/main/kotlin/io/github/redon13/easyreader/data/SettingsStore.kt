@@ -7,6 +7,7 @@ import android.util.Base64
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -46,6 +47,10 @@ data class ReaderSettings(
     /** 1.0 is the normal size; the design's default (20 sp) is a little larger. */
     val fontSize: Double = 1.2,
     val typeface: ReaderTypeface = ReaderTypeface.ALEGREYA,
+    /** Follow the phone's own brightness (including auto-brightness). */
+    val useSystemBrightness: Boolean = true,
+    /** Reader brightness, 0–1, used when [useSystemBrightness] is off. */
+    val brightness: Float = 0.5f,
 )
 
 /** The owner's choices on the Settings screen. */
@@ -146,6 +151,8 @@ class SettingsStore(context: Context) {
             fontSize = p[READER_FONT_SIZE] ?: 1.2,
             typeface = p[READER_TYPEFACE]?.let { n -> ReaderTypeface.entries.firstOrNull { it.name == n } } ?: ReaderTypeface.ALEGREYA,
             pageTurn = p[READER_PAGE_TURN]?.let { n -> PageTurn.entries.firstOrNull { it.name == n } } ?: PageTurn.SLIDE,
+            useSystemBrightness = p[READER_SYSTEM_BRIGHTNESS] ?: true,
+            brightness = p[READER_BRIGHTNESS] ?: 0.5f,
         )
     }
 
@@ -155,6 +162,8 @@ class SettingsStore(context: Context) {
             it[READER_FONT_SIZE] = settings.fontSize
             it[READER_TYPEFACE] = settings.typeface.name
             it[READER_PAGE_TURN] = settings.pageTurn.name
+            it[READER_SYSTEM_BRIGHTNESS] = settings.useSystemBrightness
+            it[READER_BRIGHTNESS] = settings.brightness
         }
     }
 
@@ -224,6 +233,8 @@ class SettingsStore(context: Context) {
         val READER_FONT_SIZE = doublePreferencesKey("reader_font_size")
         val READER_TYPEFACE = stringPreferencesKey("reader_typeface")
         val READER_PAGE_TURN = stringPreferencesKey("reader_page_turn")
+        val READER_SYSTEM_BRIGHTNESS = booleanPreferencesKey("reader_system_brightness")
+        val READER_BRIGHTNESS = floatPreferencesKey("reader_brightness")
     }
 }
 

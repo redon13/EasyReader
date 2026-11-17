@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.WindowManager
 import android.webkit.MimeTypeMap
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -72,6 +73,9 @@ class ReaderActivity : AppCompatActivity() {
             navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
 
+        // Keep the screen on while reading (only while this screen is showing).
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         root = FrameLayout(this)
         // The pages sit inside the page-curl layer, which can turn them like paper.
         curl = PageCurlLayout(this, window)
@@ -121,6 +125,12 @@ class ReaderActivity : AppCompatActivity() {
                 }
                 launch { vm.settings.collect(::applySettings) }
                 launch { vm.barsVisible.collect(::showSystemBars) }
+                launch {
+                    vm.previewBrightness.collect { preview ->
+                        val saved = vm.settings.value
+                        applyBrightness(preview ?: saved.brightness.takeUnless { saved.useSystemBrightness })
+                    }
+                }
                 launch { vm.messages.collect { Toast.makeText(this@ReaderActivity, it, Toast.LENGTH_LONG).show() } }
             }
         }
@@ -164,7 +174,10 @@ class ReaderActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                nav.currentLocator.collect { vm.onLocatorChanged(it) }
+                nav.currentLocator.collect {
+                    vm.onLocatorChanged(it)
+                    curl.pageChanged()
+                }
             }
         }
         applySettings(vm.settings.value)
@@ -182,10 +195,24 @@ class ReaderActivity : AppCompatActivity() {
         }
         (navigator as? EpubNavigatorFragment)?.submitPreferences(vm.epubPreferences(settings))
         curl.curlEnabled = settings.pageTurn == PageTurn.CURL
+        if (vm.previewBrightness.value == null) {
+            applyBrightness(settings.brightness.takeUnless { settings.useSystemBrightness })
+        }
         curl.paperColor = settings.theme.background.toInt()
     }
 
+    /**
+     * Sets this screen's brightness (0–1), or null to follow the phone. It only
+     * applies while the reader is showing; other screens use the phone's brightness.
+     */
+    private fun applyBrightness(value: Float?) {
+        window.attributes = window.attributes.apply {
+            screenBrightness = value?.coerceIn(0.01f, 1f) ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+    }
+
     private fun showSystemBars(show: Boolean) {
+        if (::curl.isInitialized) curl.pageChanged()
         val controller = WindowCompat.getInsetsController(window, root)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (show || navigator == null) controller.show(WindowInsetsCompat.Type.systemBars())

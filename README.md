@@ -56,7 +56,7 @@ EasyReader needs Calibre's content server running on the home PC, four custom co
 
 ## Status
 
-Version 1.0.0 released. All five stages are done.
+Version 1.1.0 built, ready for testing (screen stays on while reading, brightness in Aa, smoother page curl). All five stages are done; further ideas are in the [feature list](docs/FEATURE-LIST.md).
 
 | Stage | What | Status |
 | --- | --- | --- |

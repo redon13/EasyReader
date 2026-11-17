@@ -53,6 +53,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -382,6 +384,40 @@ private fun AaSheet(vm: ReaderViewModel, onDismiss: () -> Unit) {
                     color = EasyColors.TextMuted,
                 )
             }
+
+            // Brightness: for the reader only; leaving it returns to the phone's own brightness.
+            val preview by vm.previewBrightness.collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Brightness", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("Use phone brightness", style = MaterialTheme.typography.bodySmall, color = EasyColors.TextMuted)
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = settings.useSystemBrightness,
+                    onCheckedChange = { on -> vm.updateSettings { it.copy(useSystemBrightness = on) } },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = EasyColors.OnAccent,
+                        checkedTrackColor = EasyColors.Accent,
+                        uncheckedThumbColor = EasyColors.TextMuted,
+                        uncheckedTrackColor = EasyColors.SheetChip,
+                        uncheckedBorderColor = EasyColors.Outline,
+                    ),
+                )
+            }
+            Slider(
+                value = preview ?: settings.brightness,
+                onValueChange = { vm.previewBrightness(it) },
+                onValueChangeFinished = { preview?.let(vm::saveBrightness) },
+                enabled = !settings.useSystemBrightness,
+                valueRange = 0.02f..1f,
+                colors = SliderDefaults.colors(
+                    thumbColor = EasyColors.Accent,
+                    activeTrackColor = EasyColors.Accent,
+                    inactiveTrackColor = EasyColors.SheetChip,
+                    disabledThumbColor = EasyColors.TextMuted,
+                    disabledActiveTrackColor = EasyColors.TextMuted.copy(alpha = 0.4f),
+                    disabledInactiveTrackColor = EasyColors.SheetChip,
+                ),
+            )
 
             Text("Text size", style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
