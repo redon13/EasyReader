@@ -52,6 +52,7 @@ EasyReader needs Calibre's content server running on the home PC, four custom co
 - [docs/SPEC.md](docs/SPEC.md) – full app specification
 - [docs/DESIGN.md](docs/DESIGN.md) – colours, fonts and screen layouts
 - [docs/SERVER-SETUP.md](docs/SERVER-SETUP.md) – server setup checklist
+- [docs/FEATURE-LIST.md](docs/FEATURE-LIST.md) – planned features and requests after version 1.0
 
 ## Status
 
