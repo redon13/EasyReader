@@ -16,6 +16,10 @@ When a device is offline, the reading place is saved on the device and sent to C
 
 ## Done
 
+### Version 1.2.1
+
+- **Read aloud recognises the language** – each paragraph's language is worked out on the phone, so Hungarian is read with Hungarian pronunciation even when the book is labelled English. The player bar shows the language in use. Three-letter language codes from Calibre (e.g. "hun") are understood too.
+
 ### Version 1.2.0
 
 - **Read aloud** – EPUBs can be read aloud with a natural Google voice (Chirp 3 HD, Iapetus by default; any Chirp 3 HD voice can be chosen in Settings after listening to a sample). When this month's free Chirp allowance is nearly used, it moves on to Google WaveNet, then to the phone's own voice, which is also used offline or without a key. Keeps reading with the screen off, with controls on the lock screen; highlights the sentence being read and turns pages by itself; speed 0.75×–2×. Setup: [READ-ALOUD-SETUP.md](READ-ALOUD-SETUP.md).

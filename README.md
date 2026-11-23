@@ -56,7 +56,7 @@ EasyReader needs Calibre's content server running on the home PC, four custom co
 
 ## Status
 
-Version 1.2.0 built, ready for testing (read aloud – see [setting up the Google voice](docs/READ-ALOUD-SETUP.md)). All five stages are done; further ideas are in the [feature list](docs/FEATURE-LIST.md).
+Version 1.2.1 built, ready for testing (read aloud recognises the language of the text – see [setting up the Google voice](docs/READ-ALOUD-SETUP.md)). All five stages are done; further ideas are in the [feature list](docs/FEATURE-LIST.md).
 
 | Stage | What | Status |
 | --- | --- | --- |

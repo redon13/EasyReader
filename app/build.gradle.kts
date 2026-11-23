@@ -14,8 +14,8 @@ android {
         minSdk = 33
         targetSdk = 35
         // Must go up with every release so updates install over the top.
-        versionCode = 13
-        versionName = "1.2.0"
+        versionCode = 14
+        versionName = "1.2.1"
 
         // Both of the owner's Samsung devices are 64-bit ARM. Leaving out the
         // other processor types keeps the PDF engine (and the app) much smaller.
