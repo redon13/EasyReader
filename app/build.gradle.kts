@@ -14,8 +14,8 @@ android {
         minSdk = 33
         targetSdk = 35
         // Must go up with every release so updates install over the top.
-        versionCode = 12
-        versionName = "1.1.1"
+        versionCode = 13
+        versionName = "1.2.0"
 
         // Both of the owner's Samsung devices are 64-bit ARM. Leaving out the
         // other processor types keeps the PDF engine (and the app) much smaller.
@@ -107,6 +107,9 @@ dependencies {
     implementation(libs.readium.navigator)
     implementation(libs.readium.pdfium.document)
     implementation(libs.readium.pdfium.navigator)
+    // Read aloud.
+    implementation(libs.readium.tts)
+    implementation(libs.media3.session)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     testImplementation(libs.junit)

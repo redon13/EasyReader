@@ -16,6 +16,10 @@ When a device is offline, the reading place is saved on the device and sent to C
 
 ## Done
 
+### Version 1.2.0
+
+- **Read aloud** – EPUBs can be read aloud with a natural Google voice (Chirp 3 HD, Iapetus by default; any Chirp 3 HD voice can be chosen in Settings after listening to a sample). When this month's free Chirp allowance is nearly used, it moves on to Google WaveNet, then to the phone's own voice, which is also used offline or without a key. Keeps reading with the screen off, with controls on the lock screen; highlights the sentence being read and turns pages by itself; speed 0.75×–2×. Setup: [READ-ALOUD-SETUP.md](READ-ALOUD-SETUP.md).
+
 ### Version 1.1.1
 
 - **Page curl rebuilt** – during a turn the app draws both pages itself from pictures, so the real page can't flash through; recent pages are remembered, so turning straight back is instant; sideways swipes go to the curl from the first touch; fixed the old page flashing at the end of a turn back; lighter back of the page in dark mode and a crisper finish.

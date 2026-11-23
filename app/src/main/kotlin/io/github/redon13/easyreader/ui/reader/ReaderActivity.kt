@@ -83,7 +83,7 @@ class ReaderActivity : AppCompatActivity() {
         curl.addView(FragmentContainerView(this).apply { id = R.id.reader_pages }, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         val pages = curl
         val topBar = ComposeView(this).apply {
-            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish, onSearchResult = ::goToSearchResult) } }
+            setContent { EasyReaderTheme { ReaderTopOverlay(vm, onBack = ::finish, onSearchResult = ::goToSearchResult, onReadAloud = ::startReadAloud) } }
         }
         val bottomBar = ComposeView(this).apply {
             setContent { EasyReaderTheme { ReaderBottomBar(vm, onGo = ::goTo, onGoToPage = ::goToPage) } }
@@ -182,6 +182,21 @@ class ReaderActivity : AppCompatActivity() {
                 }
             }
         }
+        // Read aloud: highlight what's being spoken and keep its page showing.
+        (nav as? DecorableNavigator)?.let { decorable ->
+            lifecycleScope.launch {
+                repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    vm.readAloud.place.collect { place ->
+                        val spoken = place?.spoken ?: place?.paragraph
+                        decorable.applyDecorations(
+                            listOfNotNull(spoken?.let { Decoration("read-aloud", it, Decoration.Style.Highlight(tint = 0x66F2A23A)) }),
+                            "read-aloud",
+                        )
+                        if (spoken != null) nav.go(spoken, animated = false)
+                    }
+                }
+            }
+        }
         applySettings(vm.settings.value)
         // Start with the bars hidden after a moment, like a printed page.
         root.postDelayed({ vm.hideBars() }, 1500)
@@ -241,6 +256,16 @@ class ReaderActivity : AppCompatActivity() {
             )
             delay(4_000)
             decorable.applyDecorations(emptyList(), "search")
+        }
+    }
+
+    /** Starts reading aloud from the top of the page showing. */
+    @OptIn(ExperimentalReadiumApi::class)
+    private fun startReadAloud() {
+        val nav = navigator ?: return
+        lifecycleScope.launch {
+            vm.startReadAloud(nav.firstVisibleElementLocator())
+            vm.hideBars()
         }
     }
 

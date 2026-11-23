@@ -3,6 +3,7 @@ package io.github.redon13.easyreader
 import android.content.Context
 import io.github.redon13.easyreader.data.BookChanges
 import io.github.redon13.easyreader.data.Downloads
+import io.github.redon13.easyreader.data.GoogleTts
 import io.github.redon13.easyreader.data.LibraryRepository
 import io.github.redon13.easyreader.data.PositionSync
 import io.github.redon13.easyreader.data.SessionManager
@@ -22,4 +23,5 @@ class AppContainer(context: Context) {
     val library = LibraryRepository(database.books(), database.reading(), settings, sessions, changes)
     val positions = PositionSync(context.applicationContext, database.reading(), sessions, appScope)
     val downloads = Downloads(context.applicationContext, database.reading())
+    val googleTts = GoogleTts(context.applicationContext)
 }

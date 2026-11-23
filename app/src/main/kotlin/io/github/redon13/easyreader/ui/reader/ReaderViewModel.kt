@@ -438,6 +438,19 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- Read aloud ----------------------------------------------------------------
+
+    val readAloud = ReadAloudController(app, container, viewModelScope, _messages)
+
+    /** Read aloud works for EPUBs (PDFs have no reliable text order). */
+    val canReadAloud: Boolean get() = !isPdf && publication != null
+
+    /** Starts reading aloud from [from] (the top of the page showing). */
+    fun startReadAloud(from: Locator?) {
+        val pub = publication ?: return
+        readAloud.start(pub, from ?: _locator.value)
+    }
+
     fun toggleBars() {
         _barsVisible.value = !_barsVisible.value
     }
@@ -493,6 +506,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        readAloud.stop()
         publication?.close()
         super.onCleared()
     }

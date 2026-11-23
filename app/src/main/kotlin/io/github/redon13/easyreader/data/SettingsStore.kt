@@ -70,6 +70,23 @@ data class AppSettings(
 /** The last Calibre book opened, for "resume last book on launch". */
 data class LastBook(val libraryId: String, val bookId: Int)
 
+/** Read-aloud choices (Settings → Read aloud). */
+data class ReadAloudConfig(
+    /** Google Cloud key; null means only the phone's voice is used. Stored encrypted. */
+    val apiKey: String? = null,
+    /** Chirp 3 HD voice name, used for every language (e.g. "Iapetus"). */
+    val voiceName: String = "Iapetus",
+    /** Reading speed (1.0 = normal). */
+    val speed: Double = 1.0,
+    /** Monthly characters to use with Chirp 3 HD before moving on (free allowance is 1 million). */
+    val chirpLimit: Long = 900_000,
+    /** Monthly characters to use with WaveNet before the phone's voice (free allowance is 4 million). */
+    val wavenetLimit: Long = 3_600_000,
+)
+
+/** Characters sent to Google this month, per voice type. */
+data class ReadAloudUsage(val month: String = "", val chirp: Long = 0, val wavenet: Long = 0)
+
 data class SavedLogin(
     val serverUrl: String,
     val username: String,
@@ -211,6 +228,55 @@ class SettingsStore(context: Context) {
         }
     }
 
+    val readAloudConfig: Flow<ReadAloudConfig> = store.data.map { p ->
+        ReadAloudConfig(
+            apiKey = p[TTS_KEY]?.let { PasswordCipher.decrypt(it) }?.takeIf { it.isNotBlank() },
+            voiceName = p[TTS_VOICE] ?: "Iapetus",
+            speed = p[TTS_SPEED] ?: 1.0,
+            chirpLimit = p[TTS_CHIRP_LIMIT] ?: 900_000,
+            wavenetLimit = p[TTS_WAVENET_LIMIT] ?: 3_600_000,
+        )
+    }
+
+    suspend fun saveReadAloudConfig(config: ReadAloudConfig) {
+        store.edit {
+            val key = config.apiKey?.trim()
+            if (key.isNullOrEmpty()) it.remove(TTS_KEY) else it[TTS_KEY] = PasswordCipher.encrypt(key)
+            it[TTS_VOICE] = config.voiceName
+            it[TTS_SPEED] = config.speed
+            it[TTS_CHIRP_LIMIT] = config.chirpLimit
+            it[TTS_WAVENET_LIMIT] = config.wavenetLimit
+        }
+    }
+
+    /** This month's usage (counters start again each calendar month). */
+    val readAloudUsage: Flow<ReadAloudUsage> = store.data.map { p ->
+        val month = currentMonth()
+        if (p[TTS_USAGE_MONTH] != month) ReadAloudUsage(month) else {
+            ReadAloudUsage(month, p[TTS_USAGE_CHIRP] ?: 0, p[TTS_USAGE_WAVENET] ?: 0)
+        }
+    }
+
+    /** Adds characters sent to Google. [chirp] true for Chirp 3 HD, false for WaveNet. */
+    suspend fun addReadAloudUsage(chirp: Boolean, characters: Long) {
+        store.edit {
+            val month = currentMonth()
+            if (it[TTS_USAGE_MONTH] != month) {
+                it[TTS_USAGE_MONTH] = month
+                it[TTS_USAGE_CHIRP] = 0
+                it[TTS_USAGE_WAVENET] = 0
+            }
+            if (chirp) it[TTS_USAGE_CHIRP] = (it[TTS_USAGE_CHIRP] ?: 0) + characters
+            else it[TTS_USAGE_WAVENET] = (it[TTS_USAGE_WAVENET] ?: 0) + characters
+        }
+    }
+
+    private fun currentMonth(): String {
+        // Google's free allowance resets each calendar month (Pacific time); a day either way is harmless.
+        val now = java.time.ZonedDateTime.now(java.time.ZoneId.of("America/Los_Angeles"))
+        return "%04d-%02d".format(now.year, now.monthValue)
+    }
+
     private companion object {
         val SERVER_URL = stringPreferencesKey("server_url")
         val USERNAME = stringPreferencesKey("username")
@@ -222,6 +288,14 @@ class SettingsStore(context: Context) {
         val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
         val LIST_VIEW = booleanPreferencesKey("list_view")
         val EMPTY_SHELVES = stringSetPreferencesKey("empty_shelves")
+        val TTS_KEY = stringPreferencesKey("tts_key_encrypted")
+        val TTS_VOICE = stringPreferencesKey("tts_voice")
+        val TTS_SPEED = doublePreferencesKey("tts_speed")
+        val TTS_CHIRP_LIMIT = longPreferencesKey("tts_chirp_limit")
+        val TTS_WAVENET_LIMIT = longPreferencesKey("tts_wavenet_limit")
+        val TTS_USAGE_MONTH = stringPreferencesKey("tts_usage_month")
+        val TTS_USAGE_CHIRP = longPreferencesKey("tts_usage_chirp")
+        val TTS_USAGE_WAVENET = longPreferencesKey("tts_usage_wavenet")
         val FINISHED_AT = doublePreferencesKey("finished_at")
         val RESUME_LAST_BOOK = booleanPreferencesKey("resume_last_book")
         val PROGRESS_ON_COVERS = booleanPreferencesKey("progress_on_covers")
