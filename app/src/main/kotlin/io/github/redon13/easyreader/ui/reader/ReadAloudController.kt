@@ -34,7 +34,7 @@ import org.readium.r2.shared.util.tokenizer.Tokenizer
 /** What the read-aloud player bar shows. */
 data class ReadAloudUi(
     val playing: Boolean,
-    /** e.g. "Chirp 3 HD · Iapetus" or "Phone voice". */
+    /** e.g. "Chirp 3 HD · Iapetus · Magyar" or "Phone voice · English". */
     val voice: String,
     val speed: Double,
     val notice: String?,
@@ -129,16 +129,18 @@ class ReadAloudController(
             }
             launch {
                 val engineState = provider.engine.flatMapLatest { engine ->
-                    if (engine == null) flowOf(null to null) else combine(engine.tier, engine.notice) { t, n -> t to n }
+                    if (engine == null) flowOf(Triple(null, null, null))
+                    else combine(engine.tier, engine.notice, engine.language) { t, n, l -> Triple(t, n, l) }
                 }
-                combine(nav.playback, engineState, container.settings.readAloudConfig, nav.settings) { pb, (tier, notice), config, s ->
+                combine(nav.playback, engineState, container.settings.readAloudConfig, nav.settings) { pb, (tier, notice, language), config, s ->
+                    val voice = when (tier) {
+                        VoiceTier.Chirp -> "${tier.label} · ${config.voiceName}"
+                        null -> if (config.apiKey == null) VoiceTier.Phone.label else "Starting…"
+                        else -> tier.label
+                    }
                     ReadAloudUi(
                         playing = pb.playWhenReady,
-                        voice = when (tier) {
-                            VoiceTier.Chirp -> "${tier.label} · ${config.voiceName}"
-                            null -> if (config.apiKey == null) VoiceTier.Phone.label else "Starting…"
-                            else -> tier.label
-                        },
+                        voice = language?.let { "$voice · ${ReadAloudEngine.languageName(it)}" } ?: voice,
                         speed = s.speed,
                         notice = notice,
                     )

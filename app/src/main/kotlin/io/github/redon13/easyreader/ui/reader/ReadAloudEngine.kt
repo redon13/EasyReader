@@ -9,6 +9,8 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.view.textclassifier.TextClassificationManager
+import android.view.textclassifier.TextLanguage
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import io.github.redon13.easyreader.data.GoogleTts
@@ -110,6 +112,12 @@ class ReadAloudEngine private constructor(
     /** The voice type in use; null before anything has been spoken. */
     val tier: StateFlow<VoiceTier?> = _tier.asStateFlow()
 
+    private val _language = MutableStateFlow<String?>(null)
+    /** Google's code for the language being read, e.g. "hu-HU". */
+    val language: StateFlow<String?> = _language.asStateFlow()
+    /** The language of the last paragraph that could be recognised, used for short ones that can't. */
+    private var lastRecognised: Language? = null
+
     private val _notice = MutableStateFlow<String?>(null)
     /** A plain-words note when Google can't be used (bad key, offline…). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
@@ -168,7 +176,10 @@ class ReadAloudEngine private constructor(
         val from = resume?.takeIf { it.text == text }
         resume = null
         job = scope.launch {
-            val lang = language ?: _settings.value.language ?: defaultLanguage ?: Language(Locale.getDefault())
+            val labelled = language ?: _settings.value.language ?: defaultLanguage ?: Language(Locale.getDefault())
+            // Books are often labelled with the wrong language, so check the text itself.
+            val lang = recognise(text) ?: lastRecognised ?: labelled
+            _language.value = googleLanguage(lang)
             listener?.onStart(requestId)
             val ok = speakText(requestId, text, lang, from)
             current = null
@@ -200,6 +211,29 @@ class ReadAloudEngine private constructor(
             phoneWaiters.clear()
             runCatching { phone?.stop() }
         }
+    }
+
+    // ---- Recognising the language ----
+
+    /** The language [text] is written in, worked out on the phone; null when unsure. */
+    private suspend fun recognise(text: String): Language? {
+        val letters = text.count { it.isLetter() }
+        if (letters < 12) return null
+        // ő and ű are only used in Hungarian.
+        if (text.any { it in "őűŐŰ" }) return Language("hu").also { lastRecognised = it }
+        val found = withContext(Dispatchers.Default) {
+            runCatching {
+                val classifier = context.getSystemService(TextClassificationManager::class.java)?.textClassifier
+                    ?: return@runCatching null
+                val result = classifier.detectLanguage(TextLanguage.Request.Builder(text.take(1000)).build())
+                (0 until result.localeHypothesisCount)
+                    .map { result.getLocale(it) }
+                    .maxByOrNull { result.getConfidenceScore(it) }
+                    ?.takeIf { result.getConfidenceScore(it) >= 0.6f }
+                    ?.language
+            }.getOrNull()
+        }
+        return found?.takeIf { it.isNotEmpty() }?.let { Language(it) }?.also { lastRecognised = it }
     }
 
     // ---- Speaking one paragraph ----
@@ -437,7 +471,7 @@ class ReadAloudEngine private constructor(
         /** Google's language code for a book language, e.g. "hu" → "hu-HU", "en" → "en-GB". */
         fun googleLanguage(language: Language): String {
             val locale = language.locale
-            val lang = locale.language.ifEmpty { "en" }
+            val lang = twoLetter(locale.language.ifEmpty { "en" })
             if (locale.country.isNotEmpty()) return "$lang-${locale.country}"
             return when (lang) {
                 "en" -> "en-GB"
@@ -464,6 +498,20 @@ class ReadAloudEngine private constructor(
                 "eu" -> "eu-ES"
                 else -> "$lang-${lang.uppercase(Locale.ROOT)}"
             }
+        }
+
+        /** "hun" → "hu", "eng" → "en" (Calibre sometimes uses three-letter codes). */
+        private fun twoLetter(code: String): String {
+            if (code.length != 3) return code
+            return Locale.getAvailableLocales()
+                .firstOrNull { runCatching { it.isO3Language }.getOrNull() == code && it.language.length == 2 }
+                ?.language ?: code
+        }
+
+        /** The language's own name, e.g. "Magyar" for "hu-HU". */
+        fun languageName(code: String): String {
+            val locale = Locale.forLanguageTag(code)
+            return locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
         }
 
         suspend fun create(
