@@ -266,7 +266,7 @@ fun ReaderBottomBar(vm: ReaderViewModel, onGo: (Link) -> Unit, onGoToPage: (Loca
                 Text(text, style = MaterialTheme.typography.labelSmall, color = theme.muted())
             }
 
-            AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+            androidx.compose.animation.AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
                 Column(
                     Modifier
                         .fillMaxWidth()
