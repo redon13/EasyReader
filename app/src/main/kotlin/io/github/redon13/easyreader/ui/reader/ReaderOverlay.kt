@@ -91,7 +91,7 @@ private fun ReaderTheme.muted() = Color(secondary)
 
 /** Top bar (back, title, Aa) plus the Aa panel. */
 @Composable
-fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onSearchResult: (Locator) -> Unit) {
+fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onSearchResult: (Locator) -> Unit, onReadAloud: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val visible by vm.barsVisible.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -125,6 +125,9 @@ fun ReaderTopOverlay(vm: ReaderViewModel, onBack: () -> Unit, onSearchResult: (L
                 TextButton(onClick = vm::addToCalibre, enabled = !adding) {
                     Text(if (adding) "Adding…" else "Add to Calibre", color = EasyColors.Accent)
                 }
+            }
+            if (vm.canReadAloud) {
+                IconButton(onClick = onReadAloud) { Icon(HeadphonesIcon, "Read aloud", tint = theme.fg()) }
             }
             if (vm.canSearch) {
                 IconButton(onClick = { showSearch = true }) { Icon(Icons.Default.Search, "Search in book", tint = theme.fg()) }
@@ -243,71 +246,75 @@ fun ReaderBottomBar(vm: ReaderViewModel, onGo: (Link) -> Unit, onGoToPage: (Loca
 
     // While dragging the slider, the page number follows the finger; the jump happens on release.
     var dragging by remember { mutableStateOf<Float?>(null) }
+    val readAloud by vm.readAloud.ui.collectAsStateWithLifecycle()
 
-    Box(Modifier.fillMaxWidth()) {
-        // Footer, always there underneath the page.
-        Box(
-            Modifier.fillMaxWidth().height(ReaderActivity.FOOTER_HEIGHT_DP.dp).background(theme.bg()),
-            contentAlignment = Alignment.Center,
-        ) {
-            val text = when {
-                info == null -> "$percent%"
-                vm.isPdf -> "Page ${info.page} of ${info.total} · $percent%"
-                info.leftInChapter == 0 -> "Last page in chapter · $percent%"
-                info.leftInChapter == 1 -> "1 page left in chapter · $percent%"
-                else -> "${info.leftInChapter} pages left in chapter · $percent%"
-            }
-            Text(text, style = MaterialTheme.typography.labelSmall, color = theme.muted())
-        }
-
-        AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .background(theme.bg().copy(alpha = 0.97f))
-                    .padding(bottom = bottomInset)
-                    .padding(start = 4.dp, end = 20.dp, top = 6.dp, bottom = 6.dp),
+    Column(Modifier.fillMaxWidth()) {
+        readAloud?.let { ReadAloudBar(it, theme, vm.readAloud) }
+        Box(Modifier.fillMaxWidth()) {
+            // Footer, always there underneath the page.
+            Box(
+                Modifier.fillMaxWidth().height(ReaderActivity.FOOTER_HEIGHT_DP.dp).background(theme.bg()),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    locator?.title.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = theme.muted(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showToc = true }, enabled = vm.toc.isNotEmpty()) {
-                        Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = theme.fg())
-                    }
-                    if (info != null && info.total > 1) {
-                        val shownPage = dragging?.let { it.roundToInt() + 1 } ?: info.page
-                        Slider(
-                            value = dragging ?: (info.page - 1).toFloat(),
-                            onValueChange = { dragging = it },
-                            onValueChangeFinished = {
-                                dragging?.let { v -> vm.pages.getOrNull(v.roundToInt())?.let(onGoToPage) }
-                                dragging = null
-                            },
-                            valueRange = 0f..(info.total - 1).toFloat(),
-                            colors = SliderDefaults.colors(
-                                thumbColor = EasyColors.Accent,
-                                activeTrackColor = EasyColors.Accent,
-                                inactiveTrackColor = theme.muted().copy(alpha = 0.3f),
-                            ),
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-                        )
-                        Text(
-                            "$shownPage / ${info.total}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = theme.fg(),
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.widthIn(min = 72.dp),
-                        )
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                        Text("$percent%", style = MaterialTheme.typography.bodyMedium, color = theme.fg())
+                val text = when {
+                    info == null -> "$percent%"
+                    vm.isPdf -> "Page ${info.page} of ${info.total} · $percent%"
+                    info.leftInChapter == 0 -> "Last page in chapter · $percent%"
+                    info.leftInChapter == 1 -> "1 page left in chapter · $percent%"
+                    else -> "${info.leftInChapter} pages left in chapter · $percent%"
+                }
+                Text(text, style = MaterialTheme.typography.labelSmall, color = theme.muted())
+            }
+
+            AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(theme.bg().copy(alpha = 0.97f))
+                        .padding(bottom = bottomInset)
+                        .padding(start = 4.dp, end = 20.dp, top = 6.dp, bottom = 6.dp),
+                ) {
+                    Text(
+                        locator?.title.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = theme.muted(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showToc = true }, enabled = vm.toc.isNotEmpty()) {
+                            Icon(Icons.AutoMirrored.Filled.List, "Contents", tint = theme.fg())
+                        }
+                        if (info != null && info.total > 1) {
+                            val shownPage = dragging?.let { it.roundToInt() + 1 } ?: info.page
+                            Slider(
+                                value = dragging ?: (info.page - 1).toFloat(),
+                                onValueChange = { dragging = it },
+                                onValueChangeFinished = {
+                                    dragging?.let { v -> vm.pages.getOrNull(v.roundToInt())?.let(onGoToPage) }
+                                    dragging = null
+                                },
+                                valueRange = 0f..(info.total - 1).toFloat(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = EasyColors.Accent,
+                                    activeTrackColor = EasyColors.Accent,
+                                    inactiveTrackColor = theme.muted().copy(alpha = 0.3f),
+                                ),
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            )
+                            Text(
+                                "$shownPage / ${info.total}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = theme.fg(),
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.widthIn(min = 72.dp),
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                            Text("$percent%", style = MaterialTheme.typography.bodyMedium, color = theme.fg())
+                        }
                     }
                 }
             }

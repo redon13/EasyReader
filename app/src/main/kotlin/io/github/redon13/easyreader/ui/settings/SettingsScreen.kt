@@ -63,7 +63,7 @@ import io.github.redon13.easyreader.ui.theme.Alegreya
 import io.github.redon13.easyreader.ui.theme.EasyColors
 import kotlin.math.roundToInt
 
-/** Settings: Server, Reading and Library sections (docs/DESIGN.md). */
+/** Settings: Server, Reading, Read aloud and Library sections (docs/DESIGN.md). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: BrowseViewModel, onBack: () -> Unit) {
@@ -152,6 +152,9 @@ fun SettingsScreen(vm: BrowseViewModel, onBack: () -> Unit) {
                     SwitchRow("Resume last book on launch", app.resumeLastBook) { v -> vm.updateAppSettings { it.copy(resumeLastBook = v) } }
                 }
 
+                // ---- Read aloud ----
+                ReadAloudSection()
+
                 // ---- Library ----
                 Section("Library") {
                     SwitchRow("Progress bar on covers", app.progressOnCovers) { v -> vm.updateAppSettings { it.copy(progressOnCovers = v) } }
@@ -210,7 +213,7 @@ fun SettingsScreen(vm: BrowseViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleLarge)
         Surface(color = EasyColors.Surface, shape = RoundedCornerShape(18.dp)) {
@@ -220,7 +223,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Divider() = HorizontalDivider(color = EasyColors.Divider)
+internal fun Divider() = HorizontalDivider(color = EasyColors.Divider)
 
 @Composable
 private fun InfoRow(label: String, value: String, valueColor: Color = EasyColors.Text) {
